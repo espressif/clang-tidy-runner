@@ -1,10 +1,25 @@
 image: python:latest
 
-run:
+build:dist:
+  stage: build
   tags:
     - build
+  artifacts:
+    paths:
+      - dist/*
   script:
     - pip install -U pip
-    - pip install wheel twine
+    - pip install wheel
     - python setup.py sdist bdist_wheel
-    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${GITLAB_HTTPS_SERVER}/api/v4/projects/${CI_PROJECT_ID}/packages/pypi dist/*
+
+publish:dist:
+  stage: deploy
+  tags:
+    - build
+  dependencies:
+    - build:dist
+  when: manual
+  script:
+    - pip install -U pip
+    - pip install twine
+    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${GITLAB_HTTPS_SERVER}/api/v4/projects/${CI_PROJECT_ID}/packages/pypi --verbose dist/*
