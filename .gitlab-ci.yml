@@ -18,6 +18,8 @@ publish:dist:
     - build
   dependencies:
     - build:dist
+  only:
+    - master
   when: manual
   script:
     - pip install -U pip
