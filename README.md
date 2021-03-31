@@ -1,2 +1,1 @@
 # Clang Tidy Runner
-
