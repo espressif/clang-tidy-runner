@@ -37,27 +37,27 @@ class Runner:
         self.cores = len(dirs) if len(dirs) < cores else cores
 
         # general arguments
-        self.build_path = kwargs.pop('build_path', 'build')
-        self.warn_fn = kwargs.pop('warn_file', 'warnings.txt')
-        self.base_dir = kwargs.pop('base_dir', os.getenv('IDF_PATH', os.getcwd()))
-
-        self.log_dir = kwargs.pop('log_dir', None)
+        self.build_dir = kwargs.pop('build_dir', 'build')
         self.output_dir = kwargs.pop('output_dir', None)
+        self.log_dir = kwargs.pop('log_dir', None)
 
         # filter_cmd related
         self.compile_commands_fn = 'compile_commands.json'
         self.limit_file = kwargs.pop('limit_file', None)
-        self.xtensa_include_dir = kwargs.pop('xtensa_include_dirs',
-                                             '/opt/espressif/xtensa-esp32-elf/xtensa-esp32-elf/include/')
+        self.xtensa_include_dir = kwargs.pop('xtensa_include_dirs', None)
 
-        # run-clang-tidy.py related
+        # run_clang_tidy related
+        self.warn_fn = 'warnings.txt'
         self.run_clang_tidy_py = kwargs.pop('run_clang_tidy_py', 'run-clang-tidy.py')
-        self.clang_tidy_check_files = kwargs.pop('clang_tidy_check_files', '.*')
-        self.extra_args = kwargs.pop('extra_args',
-                                     r'-header-filter=".*\..*" '
-                                     r'-checks="-*,clang-analyzer-core.NullDereference,clang-analyzer-unix.*,'
-                                     r'bugprone-*,-bugprone-macro-parentheses,readability-*,performance-*,'
-                                     r'-readability-magic-numbers,-readability-avoid-const-params-in-decls"')
+        self.clang_tidy_check_files = kwargs.pop('file_pattern', '.*')
+        self.extra_args = kwargs.pop('extra_args', r'-header-filter=".*\..*" '
+                                                   r'-checks="-*,clang-analyzer-core.NullDereference,'
+                                                   r'clang-analyzer-unix.*,bugprone-*,-bugprone-macro-parentheses,'
+                                                   r'readability-*,performance-*,-readability-magic-numbers,'
+                                                   r'-readability-avoid-const-params-in-decls"')
+
+        # normalize related
+        self.base_dir = kwargs.pop('base_dir', os.getenv('IDF_PATH', os.getcwd()))
 
         # assign the rest arguments
         for k, v in kwargs:
@@ -124,7 +124,7 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        self.run_cmd(f'idf.py -B {self.build_path} reconfigure', stream=log_fs, cwd=folder)
+        self.run_cmd(f'idf.py -B {self.build_dir} reconfigure', stream=log_fs, cwd=folder)
 
     @chain
     def filter_cmd(self, *args):
@@ -146,15 +146,14 @@ class Runner:
 
         files = ['*']
         out = []
-        compiled_command_fp = os.path.join(folder, self.build_path, self.compile_commands_fn)
+        compiled_command_fp = os.path.join(folder, self.build_dir, self.compile_commands_fn)
         commands = json.load(open(compiled_command_fp))
         log_fs.write('Files to be analysed:\n')
         for command in commands:
             # Update compiler flags (add include dirs/remove specific flags)
             if self.xtensa_include_dir:
-                command['command'] = command['command'].replace(' -c ',
-                                                                f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ',
-                                                                1)
+                command['command'] = command['command'].replace(
+                    ' -c ', f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ', 1)
             command['command'] = command['command'].replace('-fstrict-volatile-bitfields', '')
             command['command'] = command['command'].replace('-fno-tree-switch-conversion', '')
             command['command'] = command['command'].replace('-fno-test-coverage', '')
@@ -182,7 +181,7 @@ class Runner:
             # clang-tidy would return 1 when found issue, ignore this return code
             self.run_cmd(f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
                          stream=fw,
-                         cwd=os.path.join(folder, self.build_path))
+                         cwd=os.path.join(folder, self.build_dir))
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
 
     @chain
@@ -197,7 +196,7 @@ class Runner:
         output_dir = self.output_dir or folder
         f_in = os.path.join(output_dir, self.warn_fn)
         os.makedirs(output_dir, exist_ok=True)
-        f_out = os.path.join(output_dir, f'{os.path.basename(folder)}_warnings.txt')
+        f_out = os.path.join(output_dir, f'{os.path.basename(folder)}_{self.warn_fn}')
 
         f_in_lines = open(f_in).readlines()
         with open(f_out, 'w') as fw:

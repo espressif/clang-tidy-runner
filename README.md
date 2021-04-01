@@ -46,3 +46,7 @@ runner = Runner([os.path.join(os.environ['IDF_PATH'], 'examples', 'get-started',
 runner.hello().idf_reconfigure()
 runner()
 ```
+
+## CLI Extension
+
+For each custom chain method, you should also define this in `cli_ext.py` if there're additional arguments.
