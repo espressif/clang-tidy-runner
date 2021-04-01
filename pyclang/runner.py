@@ -6,8 +6,6 @@ import sys
 from datetime import datetime
 from functools import wraps
 
-import yaml
-
 try:
     from typing import Any
 except ImportError:
@@ -130,6 +128,8 @@ class Runner:
 
     @chain
     def filter_cmd(self, *args):
+        import yaml
+
         folder = args[0]
         log_fs = args[1]
 
