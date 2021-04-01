@@ -12,4 +12,7 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.6',
+    entry_points={'console_scripts': [
+        'idf_clang = pyclang.scripts.idf_clang:main'
+    ]}
 )
