@@ -60,7 +60,7 @@ class Runner:
         self.base_dir = kwargs.pop('base_dir', os.getenv('IDF_PATH', os.getcwd()))
 
         # assign the rest arguments
-        for k, v in kwargs:
+        for k, v in kwargs.items():
             setattr(self, str(k), v)
 
         self._call_chain = []
@@ -76,7 +76,8 @@ class Runner:
         for d in self.dirs:
             if self.log_dir:
                 fw = open(os.path.join(self.log_dir,
-                                       f'{datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}_{os.path.basename(d)}.log'),
+                                       '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
+                                                          os.path.basename(d))),
                           'w')
             else:
                 fw = sys.stdout
@@ -124,7 +125,7 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        self.run_cmd(f'idf.py -B {self.build_dir} reconfigure', stream=log_fs, cwd=folder)
+        self.run_cmd('idf.py -B {} reconfigure'.format(self.build_dir), stream=log_fs, cwd=folder)
 
     @chain
     def filter_cmd(self, *args):
@@ -142,7 +143,7 @@ class Runner:
                 skip_items = limit_file['skip']
         log_fs.write('Skipped items:\n')
         for i in skip_items:
-            log_fs.write(f'- > {i}\n')
+            log_fs.write('- > {}\n'.format(i))
 
         files = ['*']
         out = []
@@ -153,7 +154,7 @@ class Runner:
             # Update compiler flags (add include dirs/remove specific flags)
             if self.xtensa_include_dir:
                 command['command'] = command['command'].replace(
-                    ' -c ', f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ', 1)
+                    ' -c ', ' -D__XTENSA__ -isystem{} -c '.format(self.xtensa_include_dir), 1)
             command['command'] = command['command'].replace('-fstrict-volatile-bitfields', '')
             command['command'] = command['command'].replace('-fno-tree-switch-conversion', '')
             command['command'] = command['command'].replace('-fno-test-coverage', '')
@@ -164,7 +165,7 @@ class Runner:
                     continue
                 if (file in command['file'] and file != '') or file == '*':
                     out.append(command)
-                    log_fs.write(f'+ > {command["file"]}\n')
+                    log_fs.write('+ > {}\n'.format(command['file']))
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
@@ -179,10 +180,10 @@ class Runner:
         warn_file = os.path.join(output_dir, self.warn_fn)
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
-            self.run_cmd(f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
-                         stream=fw,
-                         cwd=os.path.join(folder, self.build_dir))
-        log_fs.write(f'clang-tidy report generated: {warn_file}\n')
+            self.run_cmd(
+                '{} {} {} || true'.format(self.run_clang_tidy_py, self.clang_tidy_check_files, self.extra_args),
+                stream=fw, cwd=os.path.join(folder, self.build_dir))
+        log_fs.write('clang-tidy report generated: {}\n'.format(warn_file))
 
     @chain
     def normalize(self, *args):
@@ -196,7 +197,7 @@ class Runner:
         output_dir = self.output_dir or folder
         f_in = os.path.join(output_dir, self.warn_fn)
         os.makedirs(output_dir, exist_ok=True)
-        f_out = os.path.join(output_dir, f'{os.path.basename(folder)}_{self.warn_fn}')
+        f_out = os.path.join(output_dir, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
 
         f_in_lines = open(f_in).readlines()
         with open(f_out, 'w') as fw:
@@ -212,4 +213,4 @@ class Runner:
                         norm_path = norm_path
                     line = line.replace(path, norm_path)
                 fw.write(line)
-        log_fs.write(f'Normalized from {f_in} to {f_out}\n')
+        log_fs.write('Normalized from {} to {}\n'.format(f_in, f_out))
