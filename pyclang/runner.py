@@ -38,10 +38,10 @@ class Runner:
 
         # general arguments
         self.build_dir = kwargs.pop('build_dir', 'build')
-        self.output_dir = kwargs.pop('output_dir', None)
-        if self.output_dir:
-            os.makedirs(self.output_dir, exist_ok=True)
-        self.log_dir = kwargs.pop('log_dir', None)
+        self.output_path = kwargs.pop('output_path', None)
+        if self.output_path:
+            os.makedirs(self.output_path, exist_ok=True)
+        self.log_path = kwargs.pop('log_path', None)
 
         # filter_cmd related
         self.compile_commands_fn = 'compile_commands.json'
@@ -76,8 +76,8 @@ class Runner:
         #   we can't use ProcessPoolExecutor
 
         for d in self.dirs:
-            if self.log_dir:
-                fw = open(os.path.join(self.log_dir,
+            if self.log_path:
+                fw = open(os.path.join(self.log_path,
                                        '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
                                                           os.path.basename(d))),
                           'w')
@@ -178,8 +178,8 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        output_dir = self.output_dir or folder
-        warn_file = os.path.join(output_dir, self.warn_fn)
+        output_path = self.output_path or folder
+        warn_file = os.path.join(output_path, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
 
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
@@ -197,13 +197,12 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        output_dir = self.output_dir or folder
-        f_in = os.path.join(output_dir, self.warn_fn)
-        f_out = os.path.join(output_dir, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
+        output_path = self.output_path or folder
+        warn_file = os.path.join(output_path, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
 
-        f_in_lines = open(f_in).readlines()
-        with open(f_out, 'w') as fw:
-            for line in f_in_lines:
+        warnings = open(warn_file).readlines()
+        with open(warn_file, 'w') as fw:
+            for line in warnings:
                 result = self.CLANG_TIDY_REGEX.match(line)
                 if result:
                     path = result.group(1)
@@ -215,4 +214,4 @@ class Runner:
                         norm_path = norm_path
                     line = line.replace(path, norm_path)
                 fw.write(line)
-        log_fs.write('Normalized from {} to {}\n'.format(f_in, f_out))
+        log_fs.write('Normalized file {}\n'.format(warn_file))

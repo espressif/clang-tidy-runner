@@ -2,13 +2,13 @@ import argparse
 import os
 
 common_args = argparse.ArgumentParser(add_help=False)
-common_args.add_argument('dirs', nargs='+',
+common_args.add_argument('dirs', nargs='+', type=os.path.realpath,
                          help='all the dirs you want to run clang-tidy in')
 common_args.add_argument('--build-dir', default='build',
                          help='build dir')
-common_args.add_argument('--output-dir', required=False,
+common_args.add_argument('--output-path', required=False, type=os.path.realpath,
                          help='where the newly generated files locates, will use "dirs" item if not specified')
-common_args.add_argument('--log-dir', required=False,
+common_args.add_argument('--log-path', required=False, type=os.path.realpath,
                          help='where the log files will be write to. will use stdout if not specified')
 
 
