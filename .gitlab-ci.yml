@@ -20,7 +20,6 @@ publish:dist:
     - build:dist
   only:
     - master
-  when: manual
   script:
     - pip install -U pip
     - pip install twine
