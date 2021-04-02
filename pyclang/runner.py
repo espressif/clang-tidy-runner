@@ -39,6 +39,8 @@ class Runner:
         # general arguments
         self.build_dir = kwargs.pop('build_dir', 'build')
         self.output_dir = kwargs.pop('output_dir', None)
+        if self.output_dir:
+            os.makedirs(self.output_dir, exist_ok=True)
         self.log_dir = kwargs.pop('log_dir', None)
 
         # filter_cmd related
@@ -178,6 +180,7 @@ class Runner:
 
         output_dir = self.output_dir or folder
         warn_file = os.path.join(output_dir, self.warn_fn)
+
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             self.run_cmd(
@@ -196,7 +199,6 @@ class Runner:
 
         output_dir = self.output_dir or folder
         f_in = os.path.join(output_dir, self.warn_fn)
-        os.makedirs(output_dir, exist_ok=True)
         f_out = os.path.join(output_dir, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
 
         f_in_lines = open(f_in).readlines()
