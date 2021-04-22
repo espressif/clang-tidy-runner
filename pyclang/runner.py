@@ -154,13 +154,16 @@ class Runner:
         log_fs.write('Files to be analysed:\n')
         for command in commands:
             # Update compiler flags (add include dirs/remove specific flags)
+            cmdline = command['command']
             if self.xtensa_include_dir:
-                command['command'] = command['command'].replace(
-                    ' -c ', ' -D__XTENSA__ -isystem{} -c '.format(self.xtensa_include_dir), 1)
-            command['command'] = command['command'].replace('-fstrict-volatile-bitfields', '')
-            command['command'] = command['command'].replace('-fno-tree-switch-conversion', '')
-            command['command'] = command['command'].replace('-fno-test-coverage', '')
-            command['command'] = command['command'].replace('-mlongcalls', '')
+                cmdline = cmdline.replace(' -c ', ' -D__XTENSA__ -isystem{} -c '.format(self.xtensa_include_dir), 1)
+            cmdline = cmdline.replace('-fstrict-volatile-bitfields', '')
+            cmdline = cmdline.replace('-fno-tree-switch-conversion', '')
+            cmdline = cmdline.replace('-fno-test-coverage', '')
+            cmdline = cmdline.replace('-mlongcalls', '')
+            cmdline = re.sub(r'-fmacro-prefix-map=[^\s]+', '', cmdline)
+            command['command'] = cmdline
+
             for file in files:
                 # skip all listed items in limitfile and all assembly files too
                 if any(i in command['file'] for i in skip_items) or command['file'].endswith('.S'):

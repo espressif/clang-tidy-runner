@@ -16,7 +16,7 @@ filter_cmd_args = argparse.ArgumentParser(add_help=False)
 filter_cmd_args.add_argument('--limit-file', required=False,
                              help='definitions of ignore checks and files/dirs to skip')
 filter_cmd_args.add_argument('--xtensa-include-dir', nargs='?',
-                             const='/opt/espressif/xtensa-esp32-elf/xtensa-esp32-elf/include/',
+                             const='/opt/espressif/xtensa-esp32-elf-clang/xtensa-esp32-elf/include/',
                              help='extra include dir for xtensa related header files')
 
 run_clang_tidy_args = argparse.ArgumentParser(add_help=False)
