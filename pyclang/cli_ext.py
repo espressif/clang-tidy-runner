@@ -11,13 +11,12 @@ common_args.add_argument('--output-path', required=False, type=os.path.realpath,
 common_args.add_argument('--log-path', required=False, type=os.path.realpath,
                          help='where the log files will be write to. will use stdout if not specified')
 
-
-filter_cmd_args = argparse.ArgumentParser(add_help=False)
-filter_cmd_args.add_argument('--limit-file', required=False,
-                             help='definitions of ignore checks and files/dirs to skip')
-filter_cmd_args.add_argument('--xtensa-include-dir', nargs='?',
-                             const='/opt/espressif/xtensa-esp32-elf-clang/xtensa-esp32-elf/include/',
-                             help='extra include dir for xtensa related header files')
+idf_specific_args = argparse.ArgumentParser(add_help=False)
+idf_specific_args.add_argument('--limit-file', required=False,
+                               help='definitions of ignore checks and files/dirs to skip')
+idf_specific_args.add_argument('--xtensa-include-dir', nargs='?',
+                               const='/opt/espressif/xtensa-esp32-elf-clang/xtensa-esp32-elf/include/',
+                               help='extra include dir for xtensa related header files')
 
 run_clang_tidy_args = argparse.ArgumentParser(add_help=False)
 run_clang_tidy_args.add_argument('--run-clang-tidy-py', default='run-clang-tidy.py',
