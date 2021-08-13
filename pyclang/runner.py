@@ -219,15 +219,15 @@ class Runner:
 
         passed = True
         for code, messages in res.items():
-            if messages:
-                if len(messages) > self.checks_limitations[code]:
-                    log_fs.write(f'{code}: Exceed limit: ({len(messages)} > {self.checks_limitations[code]})\n')
-                    passed = False
-                else:
-                    log_fs.write(f'{code}: Within limit: ({len(messages)} <= {self.checks_limitations[code]}\n')
+            strikes = len(messages) if messages else 0
+            if strikes > self.checks_limitations[code]:
+                log_fs.write(f'{code}: Exceed limit: ({strikes} > {self.checks_limitations[code]})\n')
+                passed = False
+            else:
+                log_fs.write(f'{code}: Within limit: ({strikes} <= {self.checks_limitations[code]})\n')
 
-                for message in messages:
-                    log_fs.write(f'\t{message}\n')
+            for message in messages:
+                log_fs.write(f'\t{message}\n')
 
         if not passed:
             sys.exit(1)

@@ -2,14 +2,13 @@ import setuptools
 
 setuptools.setup(
     name='pyclang',
-    version='0.3.0-dev',
+    version='0.3.0',
     author='Fu Hanxi',
     author_email='fuhanxi@espressif.com',
     description='A python clang-tidy runner',
     packages=setuptools.find_packages(),
     install_requires=[
         'pyyaml',
-        'junit_xml',
     ],
     classifiers=[
         'Programming Language :: Python :: 3',
