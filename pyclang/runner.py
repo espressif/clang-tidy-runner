@@ -5,11 +5,9 @@ import subprocess
 import sys
 from datetime import datetime
 from functools import wraps
+from typing import Any
 
-try:
-    from typing import Any
-except ImportError:
-    pass
+import yaml
 
 
 def _remove_prefix(s, prefix):  # type: (str, str) -> str
@@ -29,11 +27,14 @@ class Runner:
     all related other params should be passed by ``__init__`` function to the Runner itself
     """
 
-    # clang-tidy warnings format:              FILE_PATH: LINE NO:  COL NO:   LEVEL: MESSAGE
-    CLANG_TIDY_REGEX = re.compile(r'(.+|[a-zA-Z]:\\\\.+):([0-9]+):([0-9]+): ([^:]+): (.+)')
+    # clang-tidy warnings format:      FILE_PATH:LINENO:COL :MSG   [ERROR IDENTIFIER]
+    CLANG_TIDY_REGEX = re.compile(r'([\w/.\- ]+):(\d+):(\d+): (.+) \[([\w\-,.]+)]')
 
     def __init__(self, dirs, cores=os.cpu_count(), **kwargs):
         self.dirs = dirs
+
+        # TODO: multi-process support. currently the closure function in ``chain`` can't be serialized by pickle,
+        #   so we can't use ProcessPoolExecutor
         self.cores = len(dirs) if len(dirs) < cores else cores
 
         # general arguments
@@ -43,9 +44,20 @@ class Runner:
             os.makedirs(self.output_path, exist_ok=True)
         self.log_path = kwargs.pop('log_path', None)
 
-        # filter_cmd related
+        # idf related
         self.compile_commands_fn = 'compile_commands.json'
         self.limit_file = kwargs.pop('limit_file', None)
+        if self.limit_file and os.path.isfile(self.limit_file):
+            with open(self.limit_file) as fr:
+                self.limit_file_json = yaml.load(fr, Loader=yaml.FullLoader)
+        else:
+            self.limit_file_json = None
+
+        if self.limit_file_json:
+            self.ignore_files = self.limit_file_json.get('skip')
+            self.ignore_checks = self.limit_file_json.get('ignore')
+            self.checks_limitations = self.limit_file_json.get('limits')
+
         self.xtensa_include_dir = kwargs.pop('xtensa_include_dirs', None)
 
         # run_clang_tidy related
@@ -72,15 +84,10 @@ class Runner:
             func(folder, log_fs)
 
     def __call__(self):
-        # TODO: multi-process support. currently the closure function in ``chain`` can't be serialized by pickle, so
-        #   we can't use ProcessPoolExecutor
-
         for d in self.dirs:
             if self.log_path:
-                fw = open(os.path.join(self.log_path,
-                                       '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
-                                                          os.path.basename(d))),
-                          'w')
+                fw = open(os.path.join(self.log_path, '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
+                                                                         os.path.basename(d))), 'w')
             else:
                 fw = sys.stdout
 
@@ -106,7 +113,6 @@ class Runner:
         Restrictions:
             All the wrapped functions should only take argument ``folder``, return ``self``.
             ``folder`` must be optional to fool the interpreter and passed through this decorator
-        :return: None
         """
 
         @wraps(func)
@@ -127,36 +133,29 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        self.run_cmd('idf.py -B {} reconfigure'.format(self.build_dir), stream=log_fs, cwd=folder)
+        self.run_cmd(f'idf.py -B {self.build_dir} reconfigure', stream=log_fs, cwd=folder)
 
     @chain
     def filter_cmd(self, *args):
-        import yaml
-
         folder = args[0]
         log_fs = args[1]
 
         log_fs.write('****** Filter files and dirs\n')
-        skip_items = []
-        if self.limit_file and os.path.isfile(self.limit_file):
-            with open(self.limit_file) as fr:
-                limit_file = yaml.load(fr, Loader=yaml.SafeLoader)
-            if limit_file['skip']:
-                skip_items = limit_file['skip']
         log_fs.write('Skipped items:\n')
-        for i in skip_items:
-            log_fs.write('- > {}\n'.format(i))
+        for i in self.ignore_files:
+            log_fs.write(f'- > {i}\n')
 
         files = ['*']
         out = []
         compiled_command_fp = os.path.join(folder, self.build_dir, self.compile_commands_fn)
-        commands = json.load(open(compiled_command_fp))
+        with open(compiled_command_fp) as fr:
+            commands = json.load(fr)
         log_fs.write('Files to be analysed:\n')
         for command in commands:
             # Update compiler flags (add include dirs/remove specific flags)
             cmdline = command['command']
             if self.xtensa_include_dir:
-                cmdline = cmdline.replace(' -c ', ' -D__XTENSA__ -isystem{} -c '.format(self.xtensa_include_dir), 1)
+                cmdline = cmdline.replace(' -c ', f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ', 1)
             cmdline = cmdline.replace('-fstrict-volatile-bitfields', '')
             cmdline = cmdline.replace('-fno-tree-switch-conversion', '')
             cmdline = cmdline.replace('-fno-test-coverage', '')
@@ -166,11 +165,11 @@ class Runner:
 
             for file in files:
                 # skip all listed items in limitfile and all assembly files too
-                if any(i in command['file'] for i in skip_items) or command['file'].endswith('.S'):
+                if any(i in command['file'] for i in self.ignore_files) or command['file'].endswith('.S'):
                     continue
                 if (file in command['file'] and file != '') or file == '*':
                     out.append(command)
-                    log_fs.write('+ > {}\n'.format(command['file']))
+                    log_fs.write(f"+ > {command['file']}\n")
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
@@ -182,26 +181,67 @@ class Runner:
         log_fs = args[1]
 
         output_path = self.output_path or folder
-        warn_file = os.path.join(output_path, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
+        warn_file = os.path.join(output_path, f'{os.path.basename(folder)}_{self.warn_fn}')
 
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
-            self.run_cmd(
-                '{} {} {} || true'.format(self.run_clang_tidy_py, self.clang_tidy_check_files, self.extra_args),
-                stream=fw, cwd=os.path.join(folder, self.build_dir))
-        log_fs.write('clang-tidy report generated: {}\n'.format(warn_file))
+            self.run_cmd(f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
+                         stream=fw,
+                         cwd=os.path.join(folder, self.build_dir))
+        log_fs.write(f'clang-tidy report generated: {warn_file}\n')
+
+    @chain
+    def check_limits(self, *args):
+        folder = args[0]
+        log_fs = args[1]
+
+        # if there's no limit in limit file, skip this process
+        if not self.checks_limitations:
+            return
+
+        output_path = self.output_path or folder
+        warn_file = os.path.join(output_path, f'{os.path.basename(folder)}_{self.warn_fn}')
+        if os.path.isfile(warn_file):
+            with open(warn_file) as fr:
+                warnings_str = fr.read()
+        else:
+            raise FileNotFoundError('warnings file not found')
+
+        res = {check: [] for check in self.checks_limitations.keys()}
+        for path, line, col, msg, code in self.CLANG_TIDY_REGEX.findall(warnings_str):
+            if code not in res:  # error identifier not in limit field
+                continue
+
+            if any(i in path for i in self.ignore_files):  # path in ignore list
+                continue
+
+            res[code].append(f'{path}:{line}:{col}: {msg}')
+
+        passed = True
+        for code, messages in res.items():
+            if messages:
+                if len(messages) > self.checks_limitations[code]:
+                    log_fs.write(f'{code}: Exceed limit: ({len(messages)} > {self.checks_limitations[code]})\n')
+                    passed = False
+                else:
+                    log_fs.write(f'{code}: Within limit: ({len(messages)} <= {self.checks_limitations[code]}\n')
+
+                for message in messages:
+                    log_fs.write(f'\t{message}\n')
+
+        if not passed:
+            sys.exit(1)
 
     @chain
     def normalize(self, *args):
         """
         Normalize and replace all the paths to relative path in the file with specified base_dir
-        :return: None
         """
         folder = args[0]
         log_fs = args[1]
 
         output_path = self.output_path or folder
-        warn_file = os.path.join(output_path, '{}_{}'.format(os.path.basename(folder), self.warn_fn))
+        warn_file = os.path.join(output_path, f'{os.path.basename(folder)}_{self.warn_fn}')
 
         warnings = open(warn_file).readlines()
         with open(warn_file, 'w') as fw:
@@ -217,4 +257,4 @@ class Runner:
                         norm_path = norm_path
                     line = line.replace(path, norm_path)
                 fw.write(line)
-        log_fs.write('Normalized file {}\n'.format(warn_file))
+        log_fs.write(f'Normalized file {warn_file}\n')

@@ -3,31 +3,23 @@
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v4.0.1
     hooks:
       - id: trailing-whitespace
-        # note: whitespace exclusions use multiline regex, see https://pre-commit.com/#regular-expressions
-        # items are:
-        # 1 - some file extensions
-        # 2 - any file matching *test*/*expected* (for host tests, if possible use this naming pattern always)
-        # 3 - any directory named 'testdata'
-        # 4 - IDF monitor test data
-        exclude: &whitespace_excludes |
-          (?x)^(
-            .+\.(md|rst|map|bin)|
-          )$
       - id: end-of-file-fixer
-        exclude: *whitespace_excludes
       - id: mixed-line-ending
         args: ['-f=lf']
       - id: double-quote-string-fixer
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.4
+    rev: 3.9.2
     hooks:
       - id: flake8
         args: ['--config=.flake8', '--tee', '--benchmark']
   - repo: https://github.com/pycqa/isort
-    rev: 5.6.4
+    rev: 5.9.3
     hooks:
       - id: isort
-        name: isort (python)
+  - repo: https://github.com/ikamensh/flynt/
+    rev: '0.63'
+    hooks:
+      - id: flynt
