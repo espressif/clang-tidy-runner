@@ -188,6 +188,12 @@ class Runner:
             self.run_cmd(f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
                          stream=fw,
                          cwd=os.path.join(folder, self.build_dir))
+
+        with open(warn_file) as fr:
+            first_line = fr.readline()
+            if 'Enabled checks' not in first_line:
+                raise ValueError(first_line)
+
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
 
     @chain
