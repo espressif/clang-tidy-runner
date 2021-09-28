@@ -27,8 +27,8 @@ class Runner:
     all related other params should be passed by ``__init__`` function to the Runner itself
     """
 
-    # clang-tidy warnings format:      FILE_PATH:LINENO:COL :MSG   [ERROR IDENTIFIER]
-    CLANG_TIDY_REGEX = re.compile(r'([\w/.\- ]+):(\d+):(\d+): (.+) \[([\w\-,.]+)]')
+    # clang-tidy warnings format:      FILE_PATH:LINENO:COL: SEVERITY: MSG [ERROR IDENTIFIER]
+    CLANG_TIDY_REGEX = re.compile(r'([\w/.\- ]+):(\d+):(\d+): (.+): (.+) \[([\w\-,.]+)]')
 
     def __init__(self, dirs, cores=os.cpu_count(), **kwargs):
         self.dirs = dirs
@@ -40,8 +40,6 @@ class Runner:
         # general arguments
         self.build_dir = kwargs.pop('build_dir', 'build')
         self.output_path = kwargs.pop('output_path', None)
-        if self.output_path:
-            os.makedirs(self.output_path, exist_ok=True)
         self.log_path = kwargs.pop('log_path', None)
 
         # idf related
@@ -79,23 +77,36 @@ class Runner:
 
         self._call_chain = []
 
-    def _run(self, folder, log_fs):
+    def _run(self, folder, log_fs, output_dir):
         for func in self._call_chain:
-            func(folder, log_fs)
+            func(folder, log_fs, output_dir)
 
     def __call__(self):
-        for d in self.dirs:
+        """
+        Will auto pass the following arguments to all functions with `@chain` decorated.
+        - folder: folder that need to run clang-tidy check
+        - log_fs: log file stream, would use sys.stdout when no `log_path` specified
+        - output_dir: output folder
+        """
+        for folder in self.dirs:
             if self.log_path:
-                fw = open(os.path.join(self.log_path, '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
-                                                                         os.path.basename(d))), 'w')
+                log_fs = open(os.path.join(self.log_path,
+                                           '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
+                                                              os.path.basename(folder))),
+                              'w')
             else:
-                fw = sys.stdout
+                log_fs = sys.stdout
 
-            self._run(d, fw)
+            if self.output_path:
+                output_dir = os.path.join(self.output_path, os.path.basename(folder))
+                os.makedirs(output_dir, exist_ok=True)
+            else:
+                output_dir = folder
+            self._run(folder, log_fs, output_dir)
 
     @staticmethod
     def run_cmd(cmd, stream=sys.stdout, **kwargs):  # type: (str, Any, ...) -> None
-        print(cmd)
+        stream.write(cmd)
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
         for line in p.stdout:
             if not isinstance(line, str):
@@ -179,10 +190,9 @@ class Runner:
     def run_clang_tidy(self, *args):
         folder = args[0]
         log_fs = args[1]
+        output_dir = args[2]
 
-        output_path = self.output_path or folder
-        warn_file = os.path.join(output_path, f'{os.path.basename(folder)}_{self.warn_fn}')
-
+        warn_file = os.path.join(output_dir, self.warn_fn)
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             self.run_cmd(f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
@@ -198,30 +208,25 @@ class Runner:
 
     @chain
     def check_limits(self, *args):
-        folder = args[0]
         log_fs = args[1]
+        output_dir = args[2]
 
         # if there's no limit in limit file, skip this process
         if not self.checks_limitations:
             return
 
-        output_path = self.output_path or folder
-        warn_file = os.path.join(output_path, f'{os.path.basename(folder)}_{self.warn_fn}')
-        if os.path.isfile(warn_file):
-            with open(warn_file) as fr:
-                warnings_str = fr.read()
-        else:
-            raise FileNotFoundError('warnings file not found')
-
+        warn_file = os.path.join(output_dir, self.warn_fn)
+        with open(warn_file) as fr:
+            warnings_str = fr.read()
         res = {check: [] for check in self.checks_limitations.keys()}
-        for path, line, col, msg, code in self.CLANG_TIDY_REGEX.findall(warnings_str):
+        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(warnings_str):
             if code not in res:  # error identifier not in limit field
                 continue
 
             if any(i in path for i in self.ignore_files):  # path in ignore list
                 continue
 
-            res[code].append(f'{path}:{line}:{col}: {msg}')
+            res[code].append(f'{path}:{line}:{col}: {severity}: {msg}')
 
         passed = True
         for code, messages in res.items():
@@ -239,17 +244,48 @@ class Runner:
             sys.exit(1)
 
     @chain
+    def make_html_report(self, *args):
+        log_fs = args[1]
+        output_dir = args[2]
+
+        try:
+            from codereport import ReportItem
+        except ImportError:
+            log_fs.write('Please run `pip install codereport` to install this optional dependency for this feature')
+            sys.exit(1)
+
+        warn_file = os.path.join(output_dir, self.warn_fn)
+        with open(warn_file) as fr:
+            warnings_str = fr.read()
+
+        res = []
+        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(warnings_str):
+            if any(i for i in self.ignore_checks if code in i):
+                continue
+
+            if any(i in path for i in self.ignore_files):
+                continue
+
+            res.append(ReportItem(path, line, severity, msg, code, col).dict())
+
+        report_json_fn = os.path.join(output_dir, 'report.json')
+        with open(report_json_fn, 'w') as fw:
+            json.dump(res, fw, indent=2)
+
+        self.run_cmd(f'codereport {report_json_fn} html_report', stream=log_fs, cwd=output_dir)
+
+    @chain
     def normalize(self, *args):
         """
         Normalize and replace all the paths to relative path in the file with specified base_dir
         """
-        folder = args[0]
         log_fs = args[1]
+        output_dir = args[2]
 
-        output_path = self.output_path or folder
-        warn_file = os.path.join(output_path, f'{os.path.basename(folder)}_{self.warn_fn}')
+        warn_file = os.path.join(output_dir, self.warn_fn)
+        with open(warn_file, 'r') as fr:
+            warnings = fr.readlines()
 
-        warnings = open(warn_file).readlines()
         with open(warn_file, 'w') as fw:
             for line in warnings:
                 result = self.CLANG_TIDY_REGEX.match(line)
