@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='pyclang',
-    version='0.3.1',
+    version='0.4.0-pre.0',
     author='Fu Hanxi',
     author_email='fuhanxi@espressif.com',
     description='A python clang-tidy runner',
@@ -10,6 +10,9 @@ setuptools.setup(
     install_requires=[
         'pyyaml',
     ],
+    extras_require={
+        'make_html_report': ['codereport'],
+    },
     classifiers=[
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
