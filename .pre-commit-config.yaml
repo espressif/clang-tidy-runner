@@ -15,11 +15,13 @@ repos:
     hooks:
       - id: flake8
         args: ['--config=.flake8', '--tee', '--benchmark']
-  - repo: https://github.com/pycqa/isort
-    rev: 5.9.3
-    hooks:
-      - id: isort
   - repo: https://github.com/ikamensh/flynt/
-    rev: '0.63'
+    rev: '0.69'
     hooks:
       - id: flynt
+  - repo: https://github.com/psf/black
+    rev: 21.9b0
+    hooks:
+      - id: black
+        exclude: failure_reason.py
+        args: [ '--skip-string-normalization' ]

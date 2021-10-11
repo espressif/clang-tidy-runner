@@ -12,7 +12,7 @@ import yaml
 
 def _remove_prefix(s, prefix):  # type: (str, str) -> str
     while s.startswith(prefix):
-        s = s[len(prefix):]
+        s = s[len(prefix) :]
     return s
 
 
@@ -28,7 +28,9 @@ class Runner:
     """
 
     # clang-tidy warnings format:      FILE_PATH:LINENO:COL: SEVERITY: MSG [ERROR IDENTIFIER]
-    CLANG_TIDY_REGEX = re.compile(r'([\w/.\- ]+):(\d+):(\d+): (.+): (.+) \[([\w\-,.]+)]')
+    CLANG_TIDY_REGEX = re.compile(
+        r'([\w/.\- ]+):(\d+):(\d+): (.+): (.+) \[([\w\-,.]+)]'
+    )
 
     def __init__(self, dirs, cores=os.cpu_count(), **kwargs):
         self.dirs = dirs
@@ -62,11 +64,14 @@ class Runner:
         self.warn_fn = 'warnings.txt'
         self.run_clang_tidy_py = kwargs.pop('run_clang_tidy_py', 'run-clang-tidy.py')
         self.clang_tidy_check_files = kwargs.pop('file_pattern', '.*')
-        self.extra_args = kwargs.pop('extra_args', r'-header-filter=".*\..*" '
-                                                   r'-checks="-*,clang-analyzer-core.NullDereference,'
-                                                   r'clang-analyzer-unix.*,bugprone-*,-bugprone-macro-parentheses,'
-                                                   r'readability-*,performance-*,-readability-magic-numbers,'
-                                                   r'-readability-avoid-const-params-in-decls"')
+        self.extra_args = kwargs.pop(
+            'extra_args',
+            r'-header-filter=".*\..*" '
+            r'-checks="-*,clang-analyzer-core.NullDereference,'
+            r'clang-analyzer-unix.*,bugprone-*,-bugprone-macro-parentheses,'
+            r'readability-*,performance-*,-readability-magic-numbers,'
+            r'-readability-avoid-const-params-in-decls"',
+        )
 
         # normalize related
         self.base_dir = kwargs.pop('base_dir', os.getenv('IDF_PATH', os.getcwd()))
@@ -90,10 +95,16 @@ class Runner:
         """
         for folder in self.dirs:
             if self.log_path:
-                log_fs = open(os.path.join(self.log_path,
-                                           '{}_{}.log'.format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
-                                                              os.path.basename(folder))),
-                              'w')
+                log_fs = open(
+                    os.path.join(
+                        self.log_path,
+                        '{}_{}.log'.format(
+                            datetime.now().strftime('%Y-%m-%d_%H:%M:%S'),
+                            os.path.basename(folder),
+                        ),
+                    ),
+                    'w',
+                )
             else:
                 log_fs = sys.stdout
 
@@ -107,7 +118,9 @@ class Runner:
     @staticmethod
     def run_cmd(cmd, stream=sys.stdout, **kwargs):  # type: (str, Any, ...) -> None
         stream.write(cmd)
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
+        p = subprocess.Popen(
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs
+        )
         for line in p.stdout:
             if not isinstance(line, str):
                 line = line.decode()
@@ -144,7 +157,9 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        self.run_cmd(f'idf.py -B {self.build_dir} reconfigure', stream=log_fs, cwd=folder)
+        self.run_cmd(
+            f'idf.py -B {self.build_dir} reconfigure', stream=log_fs, cwd=folder
+        )
 
     @chain
     def filter_cmd(self, *args):
@@ -158,7 +173,9 @@ class Runner:
 
         files = ['*']
         out = []
-        compiled_command_fp = os.path.join(folder, self.build_dir, self.compile_commands_fn)
+        compiled_command_fp = os.path.join(
+            folder, self.build_dir, self.compile_commands_fn
+        )
         with open(compiled_command_fp) as fr:
             commands = json.load(fr)
         log_fs.write('Files to be analysed:\n')
@@ -166,7 +183,9 @@ class Runner:
             # Update compiler flags (add include dirs/remove specific flags)
             cmdline = command['command']
             if self.xtensa_include_dir:
-                cmdline = cmdline.replace(' -c ', f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ', 1)
+                cmdline = cmdline.replace(
+                    ' -c ', f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ', 1
+                )
             cmdline = cmdline.replace('-fstrict-volatile-bitfields', '')
             cmdline = cmdline.replace('-fno-tree-switch-conversion', '')
             cmdline = cmdline.replace('-fno-test-coverage', '')
@@ -176,7 +195,9 @@ class Runner:
 
             for file in files:
                 # skip all listed items in limitfile and all assembly files too
-                if any(i in command['file'] for i in self.ignore_files) or command['file'].endswith('.S'):
+                if any(i in command['file'] for i in self.ignore_files) or command[
+                    'file'
+                ].endswith('.S'):
                     continue
                 if (file in command['file'] and file != '') or file == '*':
                     out.append(command)
@@ -195,9 +216,11 @@ class Runner:
         warn_file = os.path.join(output_dir, self.warn_fn)
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
-            self.run_cmd(f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
-                         stream=fw,
-                         cwd=os.path.join(folder, self.build_dir))
+            self.run_cmd(
+                f'{self.run_clang_tidy_py} {self.clang_tidy_check_files} {self.extra_args} || true',
+                stream=fw,
+                cwd=os.path.join(folder, self.build_dir),
+            )
 
         with open(warn_file) as fr:
             first_line = fr.readline()
@@ -219,7 +242,9 @@ class Runner:
         with open(warn_file) as fr:
             warnings_str = fr.read()
         res = {check: [] for check in self.checks_limitations.keys()}
-        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(warnings_str):
+        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(
+            warnings_str
+        ):
             if code not in res:  # error identifier not in limit field
                 continue
 
@@ -232,10 +257,14 @@ class Runner:
         for code, messages in res.items():
             strikes = len(messages) if messages else 0
             if strikes > self.checks_limitations[code]:
-                log_fs.write(f'{code}: Exceed limit: ({strikes} > {self.checks_limitations[code]})\n')
+                log_fs.write(
+                    f'{code}: Exceed limit: ({strikes} > {self.checks_limitations[code]})\n'
+                )
                 passed = False
             else:
-                log_fs.write(f'{code}: Within limit: ({strikes} <= {self.checks_limitations[code]})\n')
+                log_fs.write(
+                    f'{code}: Within limit: ({strikes} <= {self.checks_limitations[code]})\n'
+                )
 
             for message in messages:
                 log_fs.write(f'\t{message}\n')
@@ -251,7 +280,9 @@ class Runner:
         try:
             from codereport import ReportItem
         except ImportError:
-            log_fs.write('Please run `pip install codereport` to install this optional dependency for this feature')
+            log_fs.write(
+                'Please run `pip install codereport` to install this optional dependency for this feature'
+            )
             sys.exit(1)
 
         warn_file = os.path.join(output_dir, self.warn_fn)
@@ -259,7 +290,9 @@ class Runner:
             warnings_str = fr.read()
 
         res = []
-        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(warnings_str):
+        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(
+            warnings_str
+        ):
             if any(i for i in self.ignore_checks if code in i):
                 continue
 
@@ -272,7 +305,9 @@ class Runner:
         with open(report_json_fn, 'w') as fw:
             json.dump(res, fw, indent=2)
 
-        self.run_cmd(f'codereport {report_json_fn} html_report', stream=log_fs, cwd=output_dir)
+        self.run_cmd(
+            f'codereport {report_json_fn} html_report', stream=log_fs, cwd=output_dir
+        )
 
     @chain
     def normalize(self, *args):
@@ -291,7 +326,9 @@ class Runner:
                 result = self.CLANG_TIDY_REGEX.match(line)
                 if result:
                     path = result.group(1)
-                    norm_path = os.path.relpath(_remove_prefix(os.path.normpath(path), '../'), self.base_dir)
+                    norm_path = os.path.relpath(
+                        _remove_prefix(os.path.normpath(path), '../'), self.base_dir
+                    )
                     # if still have ../, then it's a system file, should not in idf path
                     if '../' in norm_path:
                         norm_path = '/' + _remove_prefix(norm_path, '../')
