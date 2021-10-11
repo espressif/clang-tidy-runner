@@ -1,4 +1,7 @@
 import argparse
+import os.path
+
+import yaml
 
 from pyclang import Runner
 from pyclang.cli_ext import (
@@ -16,7 +19,15 @@ def main():
     )
     args = parser.parse_args()
 
-    runner = Runner(**vars(args))
+    useful_kwargs = {k: v for k, v in vars(args).items() if v is not None}
+    if 'limit_file' in useful_kwargs and os.path.isfile(useful_kwargs['limit_file']):
+        with open(useful_kwargs['limit_file']) as fr:
+            limit_file_dict = yaml.load(fr, Loader=yaml.FullLoader)
+        useful_kwargs['exclude'] = limit_file_dict.get('skip')
+        useful_kwargs['ignore_clang_checks'] = limit_file_dict.get('ignore')
+        useful_kwargs['checks_limitations'] = limit_file_dict.get('limits')
+
+    runner = Runner(**useful_kwargs)
     runner.idf_reconfigure().filter_cmd().run_clang_tidy().check_limits().normalize()
     runner()
 
