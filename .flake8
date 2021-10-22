@@ -53,7 +53,6 @@ select =
     E133,           # closing bracket is missing indentation
     E201,           # whitespace after '('
     E202,           # whitespace before ')'
-    E203,           # whitespace before ':'
     E211,           # whitespace before '('
     E221,           # multiple spaces before operator
     E222,           # multiple spaces after operator
@@ -124,6 +123,7 @@ select =
     C901            # complexity value provided by the user
 
 ignore =
+    E203,           # whitespace before ':'
     E221,           # multiple spaces before operator
     E231,           # missing whitespace after ',', ';', or ':'
     E241,           # multiple spaces after ','

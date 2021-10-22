@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='pyclang',
-    version='0.4.0-pre.0',
+    version='0.4.0-pre.1',
     author='Fu Hanxi',
     author_email='fuhanxi@espressif.com',
     description='A python clang-tidy runner',
@@ -19,8 +19,6 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        'console_scripts': [
-            'idf_clang = pyclang.scripts.idf_clang:main'
-        ],
+        'console_scripts': ['idf_clang = pyclang.scripts.idf_clang:main'],
     },
 )
