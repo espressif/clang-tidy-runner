@@ -5,8 +5,10 @@ from pyclang import Runner
 
 def action_extensions(base_actions, project_path):
     def call_runner(subcommand_name, ctx, args, **kwargs):
-        useful_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        # idf extension don't use default values
+        kwargs['clang_extra_args'] = kwargs.get('run_clang_tidy_options', '') or ''
 
+        useful_kwargs = {k: v for k, v in kwargs.items() if v is not None}
         runner = Runner(
             [args.project_dir],
             build_dir=os.path.basename(args.build_dir),
@@ -24,7 +26,7 @@ def action_extensions(base_actions, project_path):
         'actions': {
             'clang-check': {
                 'callback': call_runner,
-                'help': 'run clang-tidy check under current folder',
+                'help': 'run clang-tidy check under current folder, write the output into "warnings.txt"',
                 'options': [
                     {
                         'names': ['--run-clang-tidy-py'],
@@ -32,12 +34,9 @@ def action_extensions(base_actions, project_path):
                         'will use "run-clang-tidy.py" if not specified.',
                     },
                     {
-                        'names': ['--clang-extra-args'],
-                        'help': 'run-clang-tidy.py arguments. will use idf default settings if not specified: '
-                        r'-header-filter=".*\..*" '
-                        r'-checks="-*,clang-analyzer-core.NullDereference,clang-analyzer-unix.*,bugprone-*,'
-                        r'-bugprone-macro-parentheses,readability-*,performance-*,-readability-magic-numbers,'
-                        r'-readability-avoid-const-params-in-decls"',
+                        'names': ['--run-clang-tidy-options'],
+                        'help': 'all optional arguments would be passed to run-clang-tidy.py. '
+                        'the value should be double-quoted',
                     },
                 ],
             },
