@@ -139,7 +139,7 @@ class Runner:
         p.stdout.close()
         return_code = p.wait()
         if return_code:
-            raise subprocess.CalledProcessError(return_code, cmd)
+            sys.exit(return_code)
 
     def chain(func):
         """
