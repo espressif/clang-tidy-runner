@@ -2,12 +2,9 @@
 
 ## Installation
 
-1. Create GitLab personal access token, record the token name and the token itself.
-2. Install this package by running:
+Please install it via `pip install pyclang`.
 
-    ```
-    pip install --index-url https://${GITLAB_ACCESS_TOKEN_NAME}:${GITLAB_ACCESS_TOKEN}@${GITLAB_SERVER}/api/v4/projects/2107/packages/pypi/simple --no-deps pyclang
-    ```
+[![pyclang](https://img.shields.io/pypi/v/pyclang?color=green&label=pyclang)](https://pypi.org/project/pyclang/)
 
 ## Examples
 
