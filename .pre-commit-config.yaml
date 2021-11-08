@@ -10,8 +10,8 @@ repos:
       - id: mixed-line-ending
         args: ['-f=lf']
       - id: double-quote-string-fixer
-  - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.9.2
+  - repo: https://github.com/pycqa/flake8
+    rev: 4.0.1
     hooks:
       - id: flake8
         args: ['--config=.flake8', '--tee', '--benchmark']
@@ -20,7 +20,7 @@ repos:
     hooks:
       - id: flynt
   - repo: https://github.com/psf/black
-    rev: 21.9b0
+    rev: 21.10b0
     hooks:
       - id: black
         exclude: failure_reason.py
