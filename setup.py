@@ -20,9 +20,12 @@ setuptools.setup(
     version=get_version(),
     author='Fu Hanxi',
     author_email='fuhanxi@espressif.com',
+    license='MIT',
     description='A python clang-tidy runner',
     long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     packages=setuptools.find_packages(),
+    python_requires='>=3.6',
     extras_require={
         'make_html_report': ['codereport'],
     },
@@ -37,7 +40,6 @@ setuptools.setup(
         'Operating System :: OS Independent',
         'License :: OSI Approved :: MIT License',
     ],
-    python_requires='>=3.6',
     entry_points={
         'console_scripts': ['idf_clang = pyclang.scripts.idf_clang:main'],
     },
