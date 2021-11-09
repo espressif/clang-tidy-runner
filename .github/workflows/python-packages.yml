@@ -8,7 +8,7 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  test_build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,3 +23,33 @@ jobs:
         run: |
           pip install wheel
           python setup.py sdist bdist_wheel
+  idf_test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [latest, release-v4.4]
+    container: espressif/idf:${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Prepare
+        run: |
+          repo=$(pwd)
+          # the workflow may change a bit after idf.py pull this in
+          cp ./pyclang/idf_extension.py $IDF_PATH/tools/idf_py_actions/temp_ext.py
+          cd $IDF_PATH
+          source ./export.sh
+          pip install -e "$repo"
+          idf_tools.py install xtensa-clang
+          source ./export.sh
+          wget https://raw.githubusercontent.com/llvm/llvm-project/main/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
+          chmod +x run-clang-tidy.py
+        shell: bash
+      - name: Test
+        run: |
+          cd $IDF_PATH
+          source ./export.sh
+          cd examples/get-started/hello_world
+          idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py
+          pip install codereport
+          idf.py clang-html-report
+        shell: bash
