@@ -5,8 +5,7 @@ import subprocess
 import sys
 from datetime import datetime
 from functools import wraps
-from io import BytesIO
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, TextIO
 
 
 def _remove_prefix(s, prefix):  # type: (str, str) -> str
@@ -106,7 +105,7 @@ class Runner:
         self.xtensa_include_dir = xtensa_include_dirs
 
         # run_clang_tidy arguments
-        self.run_clang_tidy_py = run_clang_tidy_py
+        self.run_clang_tidy_py = os.path.realpath(run_clang_tidy_py)
         self.check_files_regex = check_files_regex
         self.clang_extra_args = clang_extra_args
 
@@ -154,8 +153,8 @@ class Runner:
 
     @staticmethod
     def run_cmd(
-        cmd, log_stream=sys.stdout, stream=sys.stdout, **kwargs
-    ):  # type: (str, BytesIO, BytesIO, ...) -> None
+        cmd: str, log_stream: TextIO = sys.stdout, stream: TextIO = sys.stdout, **kwargs
+    ) -> None:
         log_stream.write(cmd + '\n')
         p = subprocess.Popen(
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs
@@ -187,6 +186,16 @@ class Runner:
             return self
 
         return wrapper
+
+    def get_check_warn_file(self, log_fs: TextIO, output_dir: str) -> str:
+        warn_file = os.path.join(output_dir, self.WARN_FILENAME)
+        if not os.path.isfile(warn_file):
+            log_fs.write(
+                f'{warn_file} not found. Please run clang-tidy to generate this file\n'
+            )
+            sys.exit(1)
+
+        return warn_file
 
     @chain
     def idf_reconfigure(self, *args):
@@ -284,7 +293,7 @@ class Runner:
         if not self.checks_limitations:
             return
 
-        warn_file = os.path.join(output_dir, self.WARN_FILENAME)
+        warn_file = self.get_check_warn_file(log_fs, output_dir)
         with open(warn_file) as fr:
             warnings_str = fr.read()
         res = {check: [] for check in self.checks_limitations.keys()}
@@ -319,6 +328,21 @@ class Runner:
             sys.exit(1)
 
     @chain
+    def remove_color_output(self, *args):
+        log_fs = args[1]
+        output_dir = args[2]
+
+        warn_file = self.get_check_warn_file(log_fs, output_dir)
+        with open(warn_file) as fr:
+            warnings_str = fr.read()
+            warnings_str = self.ANSI_ESCAPE_REGEX.sub('', warnings_str)
+
+        with open(warn_file, 'w') as fw:
+            fw.write(warnings_str)
+
+        log_fs.write(f'color outputs in "{warn_file}" are eliminated.\n')
+
+    @chain
     def make_html_report(self, *args):
         log_fs = args[1]
         output_dir = args[2]
@@ -331,10 +355,9 @@ class Runner:
             )
             sys.exit(1)
 
-        warn_file = os.path.join(output_dir, self.WARN_FILENAME)
+        warn_file = self.get_check_warn_file(log_fs, output_dir)
         with open(warn_file) as fr:
             warnings_str = fr.read()
-            warnings_str = self.ANSI_ESCAPE_REGEX.sub('', warnings_str)
 
         res = []
         for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(
