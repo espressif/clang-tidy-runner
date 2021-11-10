@@ -106,7 +106,7 @@ class Runner:
         self.xtensa_include_dir = xtensa_include_dirs
 
         # run_clang_tidy arguments
-        self.run_clang_tidy_py = run_clang_tidy_py
+        self.run_clang_tidy_py = os.path.realpath(run_clang_tidy_py)
         self.check_files_regex = check_files_regex
         self.clang_extra_args = clang_extra_args
 
