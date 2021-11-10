@@ -1,7 +1,12 @@
 import argparse
 import os.path
+import sys
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    print('please run "pip install pyyaml" to run idf_clang_tidy')
+    sys.exit(1)
 
 from pyclang import Runner
 from pyclang.cli_ext import (
