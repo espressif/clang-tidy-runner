@@ -48,6 +48,19 @@ class Runner:
         re.VERBOSE,
     )
 
+    GCC_FLAGS_MAPPING = {
+        '-fstrict-volatile-bitfields': '',
+        '-fno-tree-switch-conversion': '',
+        '-fno-test-coverage': '',
+        '-mlongcalls': '-mlong-calls',
+    }
+
+    PREFIX_MAP_MAPPING = {
+        re.compile(r'-fmacro-prefix-map=[^\s]+'): '',
+        re.compile(r'-fdebug-prefix-map=[^\s]+'): '',
+        re.compile(r'-ffile-prefix-map=[^\s]+'): '',
+    }
+
     def __init__(
         self,
         dirs: List[str],
@@ -188,6 +201,24 @@ class Runner:
         )
 
     @chain
+    def remove_command_flags(self, *args):
+        folder = args[0]
+
+        compiled_command_fp = os.path.join(
+            folder, self.build_dir, self.COMPILE_COMMANDS_FILENAME
+        )
+        with open(compiled_command_fp) as fr:
+            file_str = fr.read()
+            for k, v in self.GCC_FLAGS_MAPPING.items():
+                file_str = file_str.replace(f' {k} ', ' ' if not v else f' {v} ')
+
+            for k, v in self.PREFIX_MAP_MAPPING.items():
+                file_str = k.sub(v, file_str)
+
+        with open(compiled_command_fp, 'w') as fw:
+            fw.write(file_str)
+
+    @chain
     def filter_cmd(self, *args):
         folder = args[0]
         log_fs = args[1]
@@ -198,37 +229,24 @@ class Runner:
             for i in self.exclude:
                 log_fs.write(f'- > {i}\n')
 
-        files = ['*']
         out = []
         compiled_command_fp = os.path.join(
             folder, self.build_dir, self.COMPILE_COMMANDS_FILENAME
         )
         with open(compiled_command_fp) as fr:
             commands = json.load(fr)
-        log_fs.write('Files to be analysed:\n')
-        for command in commands:
-            # Update compiler flags (add include dirs/remove specific flags)
-            cmdline = command['command']
-            if self.xtensa_include_dir:
-                cmdline = cmdline.replace(
-                    ' -c ', f' -D__XTENSA__ -isystem{self.xtensa_include_dir} -c ', 1
-                )
-            cmdline = cmdline.replace('-fstrict-volatile-bitfields', '')
-            cmdline = cmdline.replace('-fno-tree-switch-conversion', '')
-            cmdline = cmdline.replace('-fno-test-coverage', '')
-            cmdline = cmdline.replace('-mlongcalls', '')
-            cmdline = re.sub(r'-fmacro-prefix-map=[^\s]+', '', cmdline)
-            command['command'] = cmdline
 
-            for file in files:
-                # skip all listed items in limitfile and all assembly files too
-                if (
-                    self.exclude and any(i in command['file'] for i in self.exclude)
-                ) or command['file'].endswith('.S'):
-                    continue
-                if (file in command['file'] and file != '') or file == '*':
-                    out.append(command)
-                    log_fs.write(f"+ > {command['file']}\n")
+        log_fs.write('Files to be analysed:\n')
+        check_files_regex = re.compile(self.check_files_regex)
+        for command in commands:
+            # skip all listed items in limitfile and all assembly files too
+            if (
+                self.exclude and any(i in command['file'] for i in self.exclude)
+            ) or command['file'].endswith('.S'):
+                continue
+            if check_files_regex.search(command['file']):
+                out.append(command)
+                log_fs.write(f"+ > {command['file']}\n")
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
