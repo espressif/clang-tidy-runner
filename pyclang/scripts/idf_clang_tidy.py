@@ -33,7 +33,7 @@ def main():
         useful_kwargs['checks_limitations'] = limit_file_dict.get('limits')
 
     runner = Runner(**useful_kwargs)
-    runner.idf_reconfigure().remove_command_flags().filter_cmd().run_clang_tidy().check_limits().normalize()
+    runner.idf_reconfigure().remove_command_flags().filter_cmd().run_clang_tidy().check_limits().remove_color_output().normalize()
     runner()
 
 
