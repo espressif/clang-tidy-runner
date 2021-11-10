@@ -33,6 +33,21 @@ class Runner:
     WARN_FILENAME = 'warnings.txt'
     COMPILE_COMMANDS_FILENAME = 'compile_commands.json'
 
+    ANSI_ESCAPE_REGEX = re.compile(
+        r'''
+        \x1B  # ESC
+        (?:   # 7-bit C1 Fe (except CSI)
+            [@-Z\\-_]
+        |     # or [ for CSI, followed by a control sequence
+            \[
+            [0-?]*  # Parameter bytes
+            [ -/]*  # Intermediate bytes
+            [@-~]   # Final byte
+        )
+    ''',
+        re.VERBOSE,
+    )
+
     def __init__(
         self,
         dirs: List[str],
@@ -301,6 +316,7 @@ class Runner:
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
         with open(warn_file) as fr:
             warnings_str = fr.read()
+            warnings_str = self.ANSI_ESCAPE_REGEX.sub('', warnings_str)
 
         res = []
         for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(
