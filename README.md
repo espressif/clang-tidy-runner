@@ -50,5 +50,5 @@ For each custom chain method, you should also define this in `cli_ext.py` if the
 
 ## Use as a script
 
-You can also customize it into a scripts. Now we provide a predefined script: `idf_clang`, which procedure
-is: `idf_reconfigure().filter_cmd().run_clang_tidy().normalize()`. You can run it by `idf_clang --help` for detail.
+You can also customize it into a scripts. Now we provide a predefined script: `idf_clang_tidy`, which procedure
+is: `idf_reconfigure().filter_cmd().run_clang_tidy().normalize()`. You can run it by `idf_clang_tidy --help` for detail.
