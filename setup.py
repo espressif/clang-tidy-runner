@@ -41,6 +41,6 @@ setuptools.setup(
         'License :: OSI Approved :: MIT License',
     ],
     entry_points={
-        'console_scripts': ['idf_clang = pyclang.scripts.idf_clang:main'],
+        'console_scripts': ['idf_clang_tidy = pyclang.scripts.idf_clang_tidy:main'],
     },
 )
