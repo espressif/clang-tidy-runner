@@ -5,8 +5,9 @@ from pyclang import Runner
 
 def action_extensions(base_actions, project_path):
     def call_runner(subcommand_name, ctx, args, **kwargs):
-        # idf extension don't use default values
-        kwargs['clang_extra_args'] = kwargs.get('run_clang_tidy_options', '') or ''
+        # idf extension don't need default values
+        kwargs['clang_extra_args'] = kwargs.pop('run_clang_tidy_options', '') or ''
+        kwargs['check_files_regex'] = kwargs.pop('files', None)
 
         useful_kwargs = {k: v for k, v in kwargs.items() if v is not None}
         runner = Runner(
@@ -27,6 +28,12 @@ def action_extensions(base_actions, project_path):
             'clang-check': {
                 'callback': call_runner,
                 'help': 'run clang-tidy check under current folder, write the output into "warnings.txt"',
+                'arguments': [
+                    {
+                        'names': ['files'],
+                        'nargs': -1,
+                    }
+                ],
                 'options': [
                     {
                         'names': ['--run-clang-tidy-py'],

@@ -75,7 +75,7 @@ class Runner:
         xtensa_include_dirs: Optional[str] = None,
         # run_clang_tidy related
         run_clang_tidy_py: str = 'run-clang-tidy.py',
-        check_files_regex: str = '.*',
+        check_files_regex: Optional[List[str]] = None,
         clang_extra_args: str = (
             r'-header-filter=".*\..*" '
             r'-checks="-*,clang-analyzer-core.NullDereference,clang-analyzer-unix.*,bugprone-*,'
@@ -109,7 +109,7 @@ class Runner:
             self.run_clang_tidy_py = os.path.realpath(run_clang_tidy_py)
         else:
             self.run_clang_tidy_py = run_clang_tidy_py
-        self.check_files_regex = check_files_regex
+        self.check_files_regex = check_files_regex if check_files_regex else ['.*']
         self.clang_extra_args = clang_extra_args
 
         # normalize arguments
@@ -249,7 +249,7 @@ class Runner:
             commands = json.load(fr)
 
         log_fs.write('Files to be analysed:\n')
-        check_files_regex = re.compile(self.check_files_regex)
+        check_files_regex = re.compile('|'.join(self.check_files_regex))
         for command in commands:
             # skip all listed items in limitfile and all assembly files too
             if (
@@ -274,7 +274,7 @@ class Runner:
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             self.run_cmd(
-                f'{self.run_clang_tidy_py} {self.check_files_regex} {self.clang_extra_args} || true',
+                f'{self.run_clang_tidy_py} {" ".join(self.check_files_regex)} {self.clang_extra_args} || true',
                 log_stream=log_fs,
                 stream=fw,
                 cwd=os.path.join(folder, self.build_dir),
