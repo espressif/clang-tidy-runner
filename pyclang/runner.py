@@ -386,7 +386,7 @@ class Runner:
             shutil.rmtree(html_report_folder)
 
         self.run_cmd(
-            f'codereport {report_json_fn} html_report',
+            f'codereport {report_json_fn} html_report --prefix={self.base_dir}',
             log_stream=log_fs,
             cwd=output_dir,
         )
