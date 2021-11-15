@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -379,6 +380,10 @@ class Runner:
         report_json_fn = os.path.join(output_dir, 'report.json')
         with open(report_json_fn, 'w') as fw:
             json.dump(res, fw, indent=2)
+
+        html_report_folder = os.path.join(output_dir, 'html_report')
+        if os.path.isdir(html_report_folder):
+            shutil.rmtree(html_report_folder)
 
         self.run_cmd(
             f'codereport {report_json_fn} html_report',
