@@ -70,6 +70,7 @@ class Runner:
         output_path: Optional[str] = None,
         log_path: Optional[str] = None,
         # filter arguments
+        all_related_files: bool = True,
         exclude: Optional[List[str]] = None,
         ignore_clang_checks: Optional[List[str]] = None,
         checks_limitations: Optional[Dict[str, int]] = None,
@@ -99,6 +100,7 @@ class Runner:
         self.log_path = log_path
 
         # filter arguments
+        self.all_related_files = all_related_files
         self.exclude = exclude
         self.ignore_clang_checks = ignore_clang_checks
         self.checks_limitations = checks_limitations
@@ -202,7 +204,7 @@ class Runner:
         return warn_file
 
     @chain
-    def idf_reconfigure(self, *args):
+    def idf_reconfigure(self, *args) -> 'Runner':
         """
         Run "idf.py reconfigure" to get the compiled commands
         """
@@ -236,11 +238,13 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        log_fs.write('****** Filter files and dirs\n')
-        log_fs.write('Skipped items:\n')
+        log_fs.write('****** Filter files and dirs ******\n')
         if self.exclude:
+            log_fs.write('Skipped items:\n')
             for i in self.exclude:
                 log_fs.write(f'- > {i}\n')
+        if self.all_related_files:
+            log_fs.write('Only analyze project dir')
 
         out = []
         compiled_command_fp = os.path.join(
@@ -252,7 +256,13 @@ class Runner:
         log_fs.write('Files to be analysed:\n')
         check_files_regex = re.compile('|'.join(self.check_files_regex))
         for command in commands:
-            # skip all listed items in limitfile and all assembly files too
+            if not self.all_related_files:
+                if (
+                    os.path.join(folder, self.build_dir) in command['file']
+                    or folder not in command['file']
+                ):
+                    continue
+            # skip all listed items in exclude list and all assembly files too
             if (
                 self.exclude and any(i in command['file'] for i in self.exclude)
             ) or command['file'].endswith('.S'):
@@ -263,7 +273,7 @@ class Runner:
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
-        log_fs.write('******\n')
+        log_fs.write(f'{"*" * 35}\n')
 
     @chain
     def run_clang_tidy(self, *args):

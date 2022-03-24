@@ -7,6 +7,7 @@ def action_extensions(base_actions, project_path):
     def call_runner(subcommand_name, ctx, args, **kwargs):
         # idf extension don't need default values
         kwargs['clang_extra_args'] = kwargs.pop('run_clang_tidy_options', '') or ''
+
         kwargs['check_files_regex'] = kwargs.pop('files', None)
 
         useful_kwargs = {k: v for k, v in kwargs.items() if v is not None}
@@ -17,7 +18,7 @@ def action_extensions(base_actions, project_path):
         )
 
         if subcommand_name == 'clang-check':
-            runner.idf_reconfigure().remove_command_flags().run_clang_tidy()
+            runner.idf_reconfigure().filter_cmd().remove_command_flags().run_clang_tidy()
         elif subcommand_name == 'clang-html-report':
             runner.remove_color_output().make_html_report()
 
@@ -35,6 +36,11 @@ def action_extensions(base_actions, project_path):
                     }
                 ],
                 'options': [
+                    {
+                        'names': ['--all-related-files'],
+                        'help': 'Run clang-tidy with all related files. Default run with project dir files only.',
+                        'is_flag': True,
+                    },
                     {
                         'names': ['--run-clang-tidy-py'],
                         'help': 'run-clang-tidy.py path, this file could be downloaded from llvm. '
