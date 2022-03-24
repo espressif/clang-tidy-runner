@@ -15,6 +15,10 @@ def _remove_prefix(s, prefix):  # type: (str, str) -> str
     return s
 
 
+class KnownIssue(Exception):
+    """KnownIssue"""
+
+
 class Runner:
     """
     Should be used with:
@@ -159,20 +163,32 @@ class Runner:
 
     @staticmethod
     def run_cmd(
-        cmd: str, log_stream: TextIO = sys.stdout, stream: TextIO = sys.stdout, **kwargs
-    ) -> None:
+        cmd: str,
+        log_stream: TextIO = sys.stdout,
+        stream: TextIO = sys.stdout,
+        ignore_error: Optional[str] = None,
+        **kwargs,
+    ) -> Optional[KnownIssue]:
         log_stream.write(cmd + '\n')
         p = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
         )
         for line in p.stdout:
-            if not isinstance(line, str):
+            if isinstance(line, bytes):
                 line = line.decode()
             stream.write(line)
         p.stdout.close()
         return_code = p.wait()
+        raw_stderr = p.stderr.read()
+        if isinstance(raw_stderr, bytes):
+            raw_stderr = raw_stderr.decode()
         if return_code:
+            if ignore_error:
+                if ignore_error in raw_stderr:
+                    return KnownIssue()  # nothing happens
+            stream.write(raw_stderr)
             sys.exit(return_code)
+        return None
 
     def chain(func):
         """
@@ -395,14 +411,18 @@ class Runner:
         if os.path.isdir(html_report_folder):
             shutil.rmtree(html_report_folder)
 
-        self.run_cmd(
+        known_issue = self.run_cmd(
             f'codereport {report_json_fn} html_report --prefix={self.base_dir}',
             log_stream=log_fs,
             cwd=output_dir,
+            ignore_error='AssertionError: No existing files found',
         )
-        log_fs.write(
-            f'Please open {output_dir}/html_report/index.html to view the report\n'
-        )
+        if known_issue:
+            log_fs.write('No issue found\n')
+        else:
+            log_fs.write(
+                f'Please open {output_dir}/html_report/index.html to view the report\n'
+            )
 
     @chain
     def normalize(self, *args):
