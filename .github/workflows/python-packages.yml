@@ -41,7 +41,7 @@ jobs:
           pip install -e "$repo"
           idf_tools.py install xtensa-clang
           source ./export.sh
-          wget https://raw.githubusercontent.com/llvm/llvm-project/main/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
+          wget https://raw.githubusercontent.com/espressif/llvm-project/xtensa_release_12.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
           chmod +x run-clang-tidy.py
         shell: bash
       - name: Test
