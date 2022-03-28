@@ -15,6 +15,10 @@ def _remove_prefix(s, prefix):  # type: (str, str) -> str
     return s
 
 
+class KnownIssue(Exception):
+    """KnownIssue"""
+
+
 class Runner:
     """
     Should be used with:
@@ -70,6 +74,7 @@ class Runner:
         output_path: Optional[str] = None,
         log_path: Optional[str] = None,
         # filter arguments
+        all_related_files: bool = True,
         exclude: Optional[List[str]] = None,
         ignore_clang_checks: Optional[List[str]] = None,
         checks_limitations: Optional[Dict[str, int]] = None,
@@ -99,6 +104,7 @@ class Runner:
         self.log_path = log_path
 
         # filter arguments
+        self.all_related_files = all_related_files
         self.exclude = exclude
         self.ignore_clang_checks = ignore_clang_checks
         self.checks_limitations = checks_limitations
@@ -157,20 +163,32 @@ class Runner:
 
     @staticmethod
     def run_cmd(
-        cmd: str, log_stream: TextIO = sys.stdout, stream: TextIO = sys.stdout, **kwargs
-    ) -> None:
+        cmd: str,
+        log_stream: TextIO = sys.stdout,
+        stream: TextIO = sys.stdout,
+        ignore_error: Optional[str] = None,
+        **kwargs,
+    ) -> Optional[KnownIssue]:
         log_stream.write(cmd + '\n')
         p = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
         )
         for line in p.stdout:
-            if not isinstance(line, str):
+            if isinstance(line, bytes):
                 line = line.decode()
             stream.write(line)
         p.stdout.close()
         return_code = p.wait()
+        raw_stderr = p.stderr.read()
+        if isinstance(raw_stderr, bytes):
+            raw_stderr = raw_stderr.decode()
         if return_code:
+            if ignore_error:
+                if ignore_error in raw_stderr:
+                    return KnownIssue()  # nothing happens
+            stream.write(raw_stderr)
             sys.exit(return_code)
+        return None
 
     def chain(func):
         """
@@ -202,7 +220,7 @@ class Runner:
         return warn_file
 
     @chain
-    def idf_reconfigure(self, *args):
+    def idf_reconfigure(self, *args) -> 'Runner':
         """
         Run "idf.py reconfigure" to get the compiled commands
         """
@@ -236,11 +254,13 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        log_fs.write('****** Filter files and dirs\n')
-        log_fs.write('Skipped items:\n')
+        log_fs.write('****** Filter files and dirs ******\n')
         if self.exclude:
+            log_fs.write('Skipped items:\n')
             for i in self.exclude:
                 log_fs.write(f'- > {i}\n')
+        if self.all_related_files:
+            log_fs.write('Only analyze project dir')
 
         out = []
         compiled_command_fp = os.path.join(
@@ -252,7 +272,13 @@ class Runner:
         log_fs.write('Files to be analysed:\n')
         check_files_regex = re.compile('|'.join(self.check_files_regex))
         for command in commands:
-            # skip all listed items in limitfile and all assembly files too
+            if not self.all_related_files:
+                if (
+                    os.path.join(folder, self.build_dir) in command['file']
+                    or folder not in command['file']
+                ):
+                    continue
+            # skip all listed items in exclude list and all assembly files too
             if (
                 self.exclude and any(i in command['file'] for i in self.exclude)
             ) or command['file'].endswith('.S'):
@@ -263,7 +289,7 @@ class Runner:
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
-        log_fs.write('******\n')
+        log_fs.write(f'{"*" * 35}\n')
 
     @chain
     def run_clang_tidy(self, *args):
@@ -385,14 +411,18 @@ class Runner:
         if os.path.isdir(html_report_folder):
             shutil.rmtree(html_report_folder)
 
-        self.run_cmd(
+        known_issue = self.run_cmd(
             f'codereport {report_json_fn} html_report --prefix={self.base_dir}',
             log_stream=log_fs,
             cwd=output_dir,
+            ignore_error='AssertionError: No existing files found',
         )
-        log_fs.write(
-            f'Please open {output_dir}/html_report/index.html to view the report\n'
-        )
+        if known_issue:
+            log_fs.write('No issue found\n')
+        else:
+            log_fs.write(
+                f'Please open {output_dir}/html_report/index.html to view the report\n'
+            )
 
     @chain
     def normalize(self, *args):

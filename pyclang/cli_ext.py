@@ -35,16 +35,14 @@ idf_specific_args.add_argument(
 
 run_clang_tidy_args = argparse.ArgumentParser(add_help=False)
 run_clang_tidy_args.add_argument(
-    '--check-files-regex', nargs='*', help='files to be processed (regex on path)'
+    '--check-files-regex',
+    nargs='*',
+    help='files to be processed (regex on path), will use ".*" to check all files if not specified.',
 )
 run_clang_tidy_args.add_argument(
     '--run-clang-tidy-py',
     help='run-clang-tidy.py path, this file could be downloaded from llvm. '
     'will use "run-clang-tidy.py" if not specified.',
-)
-run_clang_tidy_args.add_argument(
-    '--check-files-regex',
-    help='file pattern regex. will use ".*" to check all files if not specified.',
 )
 run_clang_tidy_args.add_argument(
     '--clang-extra-args',
