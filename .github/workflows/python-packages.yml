@@ -53,3 +53,8 @@ jobs:
           pip install codereport
           idf.py clang-html-report
         shell: bash
+      - uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: test_logs
+          path: /opt/esp/idf/examples/get-started/hello_world/
