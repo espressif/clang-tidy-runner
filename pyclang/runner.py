@@ -8,8 +8,10 @@ from datetime import datetime
 from functools import wraps
 from typing import List, Dict, Optional, TextIO
 
+from .utils import to_path
 
-def _remove_prefix(s, prefix):  # type: (str, str) -> str
+
+def _remove_prefix(s: str, prefix: str) -> str:
     while s.startswith(prefix):
         s = s[len(prefix) :]
     return s
@@ -74,8 +76,9 @@ class Runner:
         output_path: Optional[str] = None,
         log_path: Optional[str] = None,
         # filter arguments
-        all_related_files: bool = True,
-        exclude: Optional[List[str]] = None,
+        all_files: bool = True,
+        include_paths: Optional[List[str]] = None,
+        exclude_paths: Optional[List[str]] = None,
         ignore_clang_checks: Optional[List[str]] = None,
         checks_limitations: Optional[Dict[str, int]] = None,
         xtensa_include_dirs: Optional[str] = None,
@@ -104,8 +107,13 @@ class Runner:
         self.log_path = log_path
 
         # filter arguments
-        self.all_related_files = all_related_files
-        self.exclude = exclude
+        self.all_files = all_files
+        self.include_paths = (
+            [to_path(p) for p in include_paths] if include_paths else []
+        )
+        self.exclude_paths = (
+            [to_path(p) for p in exclude_paths] if exclude_paths else []
+        )
         self.ignore_clang_checks = ignore_clang_checks
         self.checks_limitations = checks_limitations
 
@@ -255,12 +263,17 @@ class Runner:
         log_fs = args[1]
 
         log_fs.write('****** Filter files and dirs ******\n')
-        if self.exclude:
-            log_fs.write('Skipped items:\n')
-            for i in self.exclude:
-                log_fs.write(f'- > {i}\n')
-        if self.all_related_files:
-            log_fs.write('Only analyze project dir')
+        if self.all_files:
+            log_fs.write('Including all files.\n')
+        else:
+            if self.include_paths:
+                log_fs.write('Included paths:\n')
+                for i in self.include_paths:
+                    log_fs.write(f'+ > {str(i)}\n')
+            if self.exclude_paths:
+                log_fs.write('Excluded paths:\n')
+                for i in self.exclude_paths:
+                    log_fs.write(f'- > {str(i)}\n')
 
         out = []
         compiled_command_fp = os.path.join(
@@ -270,22 +283,32 @@ class Runner:
             commands = json.load(fr)
 
         log_fs.write('Files to be analysed:\n')
-        check_files_regex = re.compile('|'.join(self.check_files_regex))
         for command in commands:
-            if not self.all_related_files:
-                if (
-                    os.path.join(folder, self.build_dir) in command['file']
-                    or folder not in command['file']
+            _file = to_path(command['file'])
+            if _file.suffix == '.S':  # assembly file
+                continue
+
+            if to_path(folder, self.build_dir) in _file.parents:  # build dir
+                continue
+
+            if not self.all_files:
+                # skip files in exclude paths
+                if self.exclude_paths and any(
+                    i in _file.parents for i in self.exclude_paths
                 ):
                     continue
-            # skip all listed items in exclude list and all assembly files too
-            if (
-                self.exclude and any(i in command['file'] for i in self.exclude)
-            ) or command['file'].endswith('.S'):
-                continue
-            if check_files_regex.search(command['file']):
-                out.append(command)
-                log_fs.write(f"+ > {command['file']}\n")
+                # skip files not in include paths or project dir
+                if not (
+                    (
+                        self.include_paths
+                        and any(i in _file.parents for i in self.include_paths)
+                    )
+                    or to_path(folder) in _file.parents
+                ):
+                    continue
+
+            out.append(command)
+            log_fs.write(f"+ > {command['file']}\n")
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
@@ -333,7 +356,9 @@ class Runner:
             if code not in res:  # error identifier not in limit field
                 continue
 
-            if any(i in path for i in self.exclude):  # path in ignore list
+            if any(
+                i in to_path(path).parents for i in self.exclude_paths
+            ):  # path in ignore list
                 continue
 
             res[code].append(f'{path}:{line}:{col}: {severity}: {msg}')
@@ -398,7 +423,7 @@ class Runner:
             ):
                 continue
 
-            if self.exclude and any(i in path for i in self.exclude):
+            if self.exclude_paths and any(i in to_path(path).parents for i in self.exclude_paths):
                 continue
 
             res.append(ReportItem(path, line, severity, msg, code, col).dict())
