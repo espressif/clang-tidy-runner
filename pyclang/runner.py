@@ -2,13 +2,12 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from datetime import datetime
 from functools import wraps
 from typing import List, Dict, Optional, TextIO
 
-from .utils import to_path
+from .utils import to_path, run_cmd
 
 
 def _remove_prefix(s: str, prefix: str) -> str:
@@ -169,35 +168,6 @@ class Runner:
                 output_dir = folder
             self._run(folder, log_fs, output_dir)
 
-    @staticmethod
-    def run_cmd(
-        cmd: str,
-        log_stream: TextIO = sys.stdout,
-        stream: TextIO = sys.stdout,
-        ignore_error: Optional[str] = None,
-        **kwargs,
-    ) -> Optional[KnownIssue]:
-        log_stream.write(cmd + '\n')
-        p = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
-        )
-        for line in p.stdout:
-            if isinstance(line, bytes):
-                line = line.decode()
-            stream.write(line)
-        p.stdout.close()
-        return_code = p.wait()
-        raw_stderr = p.stderr.read()
-        if isinstance(raw_stderr, bytes):
-            raw_stderr = raw_stderr.decode()
-        if return_code:
-            if ignore_error:
-                if ignore_error in raw_stderr:
-                    return KnownIssue()  # nothing happens
-            stream.write(raw_stderr)
-            sys.exit(return_code)
-        return None
-
     def chain(func):
         """
         Use this wrapper to wrap functions into call chains.
@@ -235,7 +205,7 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
-        self.run_cmd(
+        run_cmd(
             f'idf.py -B {self.build_dir} reconfigure', log_stream=log_fs, cwd=folder
         )
 
@@ -323,7 +293,7 @@ class Runner:
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
-            self.run_cmd(
+            run_cmd(
                 f'{self.run_clang_tidy_py} {" ".join(self.check_files_regex)} {self.clang_extra_args} || true',
                 log_stream=log_fs,
                 stream=fw,
@@ -423,7 +393,9 @@ class Runner:
             ):
                 continue
 
-            if self.exclude_paths and any(i in to_path(path).parents for i in self.exclude_paths):
+            if self.exclude_paths and any(
+                i in to_path(path).parents for i in self.exclude_paths
+            ):
                 continue
 
             res.append(ReportItem(path, line, severity, msg, code, col).dict())
@@ -436,7 +408,7 @@ class Runner:
         if os.path.isdir(html_report_folder):
             shutil.rmtree(html_report_folder)
 
-        known_issue = self.run_cmd(
+        known_issue = run_cmd(
             f'codereport {report_json_fn} html_report --prefix={self.base_dir}',
             log_stream=log_fs,
             cwd=output_dir,
