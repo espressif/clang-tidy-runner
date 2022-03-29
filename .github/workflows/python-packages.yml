@@ -50,7 +50,7 @@ jobs:
           source ./export.sh
           cd examples/get-started/hello_world
           idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py
-          pip install codereport
+          pip install "codereport~=0.2.5"
           idf.py clang-html-report
         shell: bash
       - uses: actions/upload-artifact@v2
