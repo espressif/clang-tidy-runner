@@ -38,9 +38,12 @@ jobs:
           repo=$(pwd)
           # the workflow may change a bit after idf.py pull this in
           cp ./pyclang/idf_extension.py $IDF_PATH/tools/idf_py_actions/temp_ext.py
+          # use idf python env
+          source $IDF_PATH/export.sh
+          # install this package
+          pip install -e ".[html]"
+          # go to idf path and install the other stuffs
           cd $IDF_PATH
-          source ./export.sh
-          pip install -e "$repo"
           idf_tools.py install xtensa-clang
           source ./export.sh
           wget https://raw.githubusercontent.com/espressif/llvm-project/xtensa_release_12.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
@@ -52,7 +55,6 @@ jobs:
           source ./export.sh
           cd examples/get-started/hello_world
           idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py
-          pip install "codereport~=0.2.5"
           idf.py clang-html-report
         shell: bash
       - uses: actions/upload-artifact@v2
