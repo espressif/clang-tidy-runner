@@ -30,6 +30,8 @@ jobs:
         version: [latest, release-v4.4]
     container: espressif/idf:${{ matrix.version }}
     steps:
+      - name: workaround permission issue
+        run: git config --global --add safe.directory /__w/clang-tidy-runner/clang-tidy-runner
       - uses: actions/checkout@v2
       - name: Prepare
         run: |
