@@ -1,3 +1,19 @@
+## v0.2.0 (2022-04-14)
+
+### Fix
+
+- add jinja2 version constraint
+- fix error when running codereport with empty warnings file
+- remove duplicated cli option
+
+### Feat
+
+- remove color output when running clang-check
+- rename extras_require to "html"
+- duplicate clang-tidy output to sys.stdout and file output
+- add cli option "--include-paths" and "--exclude-paths"
+- add cli option '--all-related-files', run clang-tidy with project dir only by default
+
 ## v0.1.2 (2021-11-15)
 
 ### Fix
