@@ -18,9 +18,9 @@ def action_extensions(base_actions, project_path):
         )
 
         if subcommand_name == 'clang-check':
-            runner.idf_reconfigure().filter_cmd().remove_command_flags().run_clang_tidy()
+            runner.idf_reconfigure().filter_cmd().remove_command_flags().run_clang_tidy().remove_color_output()
         elif subcommand_name == 'clang-html-report':
-            runner.remove_color_output().make_html_report()
+            runner.make_html_report()
 
         runner()
 
