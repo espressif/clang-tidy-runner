@@ -28,7 +28,7 @@ def main():
     if 'limit_file' in useful_kwargs and os.path.isfile(useful_kwargs['limit_file']):
         with open(useful_kwargs['limit_file']) as fr:
             limit_file_dict = yaml.load(fr, Loader=yaml.FullLoader)
-        useful_kwargs['exclude'] = limit_file_dict.get('skip')
+        useful_kwargs['exclude_paths'] = limit_file_dict.get('skip')
         useful_kwargs['ignore_clang_checks'] = limit_file_dict.get('ignore')
         useful_kwargs['checks_limitations'] = limit_file_dict.get('limits')
 
