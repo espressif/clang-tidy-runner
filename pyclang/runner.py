@@ -294,7 +294,7 @@ class Runner:
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             run_cmd(
-                f'{self.run_clang_tidy_py} {" ".join(self.check_files_regex)} {self.clang_extra_args} || true',
+                f'{sys.executable} {self.run_clang_tidy_py} {" ".join(self.check_files_regex)} {self.clang_extra_args} || true',
                 log_stream=log_fs,
                 stream=fw,
                 cwd=os.path.join(folder, self.build_dir),
