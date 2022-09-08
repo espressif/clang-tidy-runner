@@ -43,8 +43,7 @@ def run_cmd(
 
         return_code = p.wait()
         if return_code:
-            with open(fw.name, 'rb') as fr:
-                raw_stderr = to_str(fr.read())
+            raw_stderr = to_str(fw.read())
             if ignore_error and ignore_error in raw_stderr:
                 return KnownIssue()  # nothing happens
             if raw_stderr:
