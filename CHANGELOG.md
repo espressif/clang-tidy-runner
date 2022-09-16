@@ -1,3 +1,10 @@
+## v0.2.1 (2022-09-16)
+
+### Fix
+
+- prefix the call to run_clang_tidy.py with python
+- don't open temporary file twice
+
 ## v0.2.0 (2022-04-14)
 
 ### Fix
