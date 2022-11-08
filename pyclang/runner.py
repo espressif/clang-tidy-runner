@@ -205,14 +205,26 @@ class Runner:
         folder = args[0]
         log_fs = args[1]
 
+        # tell IDF build system to prepare compilation commands for Clang based toolchain
+        env = os.environ.copy()
+        env['IDF_TOOLCHAIN'] = 'clang'
+
         run_cmd(
-            f'idf.py -B {self.build_dir} reconfigure', log_stream=log_fs, cwd=folder
+            f'idf.py -B {self.build_dir} reconfigure', log_stream=log_fs, cwd=folder, env=env
         )
 
     @chain
     def remove_command_flags(self, *args):
         folder = args[0]
 
+        # see if the IDF version recognizes Clang toolchain
+        with open(os.path.join(folder, self.build_dir, 'CMakeCache.txt'), 'r') as cmake_cache_fp:
+            cmake_cache = cmake_cache_fp.read()
+        if 'IDF_TOOLCHAIN:STRING=clang' in cmake_cache:
+            # it does! nothing to do here, compile_commands.json already contains clang-compatible flags
+            return
+
+        # if it doesn't, need to remove GCC-specific flags from compile_commands.json
         compiled_command_fp = os.path.join(
             folder, self.build_dir, self.COMPILE_COMMANDS_FILENAME
         )
