@@ -1,7 +1,7 @@
 import os
+import shlex
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import typing as t
@@ -22,35 +22,43 @@ class KnownIssue(Exception):
 
 
 def run_cmd(
-    cmd: str,
+    cmd: t.Union[t.List[str], str],
     log_stream: t.TextIO = sys.stdout,
     stream: t.TextIO = sys.stdout,
     ignore_error: t.Optional[str] = None,
+    expect_returncode: t.Optional[t.Union[t.List[int], int]] = None,
     **kwargs,
 ) -> t.Optional[KnownIssue]:
-    log_stream.write('run command: ' + cmd + '\n')
-    with tempfile.NamedTemporaryFile() as fw:
-        # set stdout and stderr both to subprocess.PIPE may cause deadlock
-        # https://docs.python.org/3/library/subprocess.html#subprocess.Popen.wait
-        p = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=fw, **kwargs
-        )
-        for line in p.stdout:
-            line = to_str(line)
-            stream.write(line)
-            if stream != sys.stdout:
-                sys.stdout.write(line)
-        p.stdout.close()
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd)
+    cmd_str = ' '.join(cmd)
 
-        return_code = p.wait()
-        if return_code:
-            raw_stderr = to_str(fw.read())
-            if ignore_error and ignore_error in raw_stderr:
-                return KnownIssue()  # nothing happens
-            if raw_stderr:
-                sys.stdout.write(
-                    f'While running "{cmd}", process returned {return_code} with the following stderr:\n'
-                )
-                sys.stdout.write(raw_stderr)
-                sys.stdout.flush()
-                sys.exit(return_code)
+    log_stream.write(f'Running command: "{cmd_str}"...\n')
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    # live print the stdout as well
+    for line in p.stdout:
+        line = to_str(line)
+        stream.write(line)
+        if stream != sys.stdout:
+            sys.stdout.write(line)
+
+    if expect_returncode is None:
+        expect_returncode = [0]
+
+    if isinstance(expect_returncode, int):
+        expect_returncode = [expect_returncode]
+
+    returncode = p.wait()
+    raw_stderr = to_str(p.stderr.read())
+    if returncode not in expect_returncode:
+        sys.stderr.write(raw_stderr)
+        sys.stderr.flush()
+        raise RuntimeError(f'command "{cmd_str}" failed with exitcode {returncode}')
+
+    if raw_stderr:
+        if ignore_error and ignore_error in raw_stderr:
+            return KnownIssue()  # nothing happens
+
+        sys.stderr.write(
+            f'command "{cmd_str}" gives the following warnings with exitcode {returncode}:\n{raw_stderr}\n'
+        )

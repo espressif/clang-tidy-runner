@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import sys
+import shlex
 from datetime import datetime
 from functools import wraps
 
@@ -220,7 +221,9 @@ class Runner:
         log_fs = args[1]
 
         run_cmd(
-            f'idf.py -B {self.build_dir} reconfigure', log_stream=log_fs, cwd=folder
+            ['idf.py', '-B', self.build_dir, 'reconfigure'],
+            log_stream=log_fs,
+            cwd=folder,
         )
 
     @chain
@@ -305,13 +308,24 @@ class Runner:
         output_dir = args[2]
 
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
+
+        cmd = [
+            sys.executable,
+            self.run_clang_tidy_py,
+        ]
+        if self.clang_extra_args:
+            cmd.extend(shlex.split(self.clang_extra_args))
+
+        cmd.append(' '.join(self.check_files_regex))
+
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             run_cmd(
-                f'{sys.executable} {self.run_clang_tidy_py} {" ".join(self.check_files_regex)} {self.clang_extra_args} || true',
+                cmd,
                 log_stream=log_fs,
                 stream=fw,
                 cwd=os.path.join(folder, self.build_dir),
+                expect_returncode=[0, 1],
             )
 
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
@@ -418,10 +432,11 @@ class Runner:
             shutil.rmtree(html_report_folder)
 
         known_issue = run_cmd(
-            f'codereport {report_json_fn} html_report --prefix={self.base_dir}',
+            ['codereport', '--prefix', self.base_dir, report_json_fn, 'html_report'],
             log_stream=log_fs,
             cwd=output_dir,
             ignore_error='AssertionError: No existing files found',
+            expect_returncode=[0, 1],
         )
         if known_issue:
             log_fs.write('No issue found\n')
