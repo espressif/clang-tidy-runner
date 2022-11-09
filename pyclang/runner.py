@@ -3,9 +3,11 @@ import os
 import re
 import shutil
 import sys
+import shlex
 from datetime import datetime
 from functools import wraps
-from typing import List, Dict, Optional, TextIO
+
+import typing as t
 
 from .utils import to_path, run_cmd
 
@@ -14,10 +16,6 @@ def _remove_prefix(s: str, prefix: str) -> str:
     while s.startswith(prefix):
         s = s[len(prefix) :]
     return s
-
-
-class KnownIssue(Exception):
-    """KnownIssue"""
 
 
 class Runner:
@@ -31,8 +29,9 @@ class Runner:
     all related other params should be passed by ``__init__`` function to the Runner itself
     """
 
-    # clang-tidy warnings format:      FILE_PATH:LINENO:COL: SEVERITY: MSG [ERROR IDENTIFIER]
     CLANG_TIDY_REGEX = re.compile(
+        # clang-tidy warnings format:
+        # FILE_PATH:  LINENO:  COL:SEVERITY:MSG [ERROR IDENTIFIER]
         r'([\w/.\- ]+):(\d+):(\d+): (.+): (.+) \[([\w\-,.]+)]'
     )
     WARN_FILENAME = 'warnings.txt'
@@ -68,22 +67,22 @@ class Runner:
 
     def __init__(
         self,
-        dirs: List[str],
+        dirs: t.List[str],
         cores: int = os.cpu_count(),
         # general arguments
         build_dir: str = 'build',
-        output_path: Optional[str] = None,
-        log_path: Optional[str] = None,
+        output_path: t.Optional[str] = None,
+        log_path: t.Optional[str] = None,
         # filter arguments
         all_files: bool = True,
-        include_paths: Optional[List[str]] = None,
-        exclude_paths: Optional[List[str]] = None,
-        ignore_clang_checks: Optional[List[str]] = None,
-        checks_limitations: Optional[Dict[str, int]] = None,
-        xtensa_include_dirs: Optional[str] = None,
+        include_paths: t.Optional[t.List[str]] = None,
+        exclude_paths: t.Optional[t.List[str]] = None,
+        ignore_clang_checks: t.Optional[t.List[str]] = None,
+        checks_limitations: t.Optional[t.Dict[str, int]] = None,
+        xtensa_include_dirs: t.Optional[str] = None,
         # run_clang_tidy related
         run_clang_tidy_py: str = 'run-clang-tidy.py',
-        check_files_regex: Optional[List[str]] = None,
+        check_files_regex: t.Optional[t.List[str]] = None,
         clang_extra_args: str = (
             r'-header-filter=".*\..*" '
             r'-checks="-*,clang-analyzer-core.NullDereference,clang-analyzer-unix.*,bugprone-*,'
@@ -119,10 +118,9 @@ class Runner:
         self.xtensa_include_dir = xtensa_include_dirs
 
         # run_clang_tidy arguments
-        if os.path.isfile(os.path.realpath(run_clang_tidy_py)):
-            self.run_clang_tidy_py = os.path.realpath(run_clang_tidy_py)
-        else:
-            self.run_clang_tidy_py = run_clang_tidy_py
+        self._run_clang_tidy_py = run_clang_tidy_py
+        self._checked_run_clang_tidy_py = False
+
         self.check_files_regex = check_files_regex if check_files_regex else ['.*']
         self.clang_extra_args = clang_extra_args
 
@@ -134,6 +132,23 @@ class Runner:
             setattr(self, str(k), v)
 
         self._call_chain = []
+
+    @property
+    def run_clang_tidy_py(self):
+        if not self._checked_run_clang_tidy_py:
+            if os.path.isfile(os.path.realpath(self._run_clang_tidy_py)):
+                self._run_clang_tidy_py = os.path.realpath(self._run_clang_tidy_py)
+            else:
+                # check if executable is in PATH
+                self._run_clang_tidy_py = shutil.which(self._run_clang_tidy_py)
+                if not self.run_clang_tidy_py:
+                    raise FileNotFoundError(
+                        f'{self._run_clang_tidy_py} not found in your PATH'
+                    )
+
+            self._checked_run_clang_tidy_py = True
+
+        return self._run_clang_tidy_py
 
     def _run(self, folder, log_fs, output_dir):
         for func in self._call_chain:
@@ -187,7 +202,7 @@ class Runner:
 
         return wrapper
 
-    def get_check_warn_file(self, log_fs: TextIO, output_dir: str) -> str:
+    def get_check_warn_file(self, log_fs: t.TextIO, output_dir: str) -> str:
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
         if not os.path.isfile(warn_file):
             log_fs.write(
@@ -198,7 +213,7 @@ class Runner:
         return warn_file
 
     @chain
-    def idf_reconfigure(self, *args) -> 'Runner':
+    def idf_reconfigure(self, *args):
         """
         Run "idf.py reconfigure" to get the compiled commands
         """
@@ -206,7 +221,9 @@ class Runner:
         log_fs = args[1]
 
         run_cmd(
-            f'idf.py -B {self.build_dir} reconfigure', log_stream=log_fs, cwd=folder
+            ['idf.py', '-B', self.build_dir, 'reconfigure'],
+            log_stream=log_fs,
+            cwd=folder,
         )
 
     @chain
@@ -291,19 +308,23 @@ class Runner:
         output_dir = args[2]
 
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
+
+        cmd = [
+            sys.executable,
+            self.run_clang_tidy_py,
+            '-p',
+            self.build_dir,
+        ]
+        if self.clang_extra_args:
+            cmd.extend(shlex.split(self.clang_extra_args))
+
+        cmd.append(' '.join(self.check_files_regex))
+
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             run_cmd(
-                f'{sys.executable} {self.run_clang_tidy_py} {" ".join(self.check_files_regex)} {self.clang_extra_args} || true',
-                log_stream=log_fs,
-                stream=fw,
-                cwd=os.path.join(folder, self.build_dir),
+                cmd, log_stream=log_fs, stream=fw, cwd=folder, expect_returncode=[0, 1]
             )
-
-        with open(warn_file) as fr:
-            first_line = fr.readline()
-            if 'Enabled checks' not in first_line:
-                raise ValueError(first_line)
 
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
 
@@ -376,7 +397,8 @@ class Runner:
             from codereport import ReportItem
         except ImportError:
             log_fs.write(
-                'Please run `pip install codereport` to install this optional dependency for this feature'
+                'Please run `pip install "pyclang[html]"'
+                'to install this optional dependency for this feature'
             )
             sys.exit(1)
 
@@ -409,10 +431,11 @@ class Runner:
             shutil.rmtree(html_report_folder)
 
         known_issue = run_cmd(
-            f'codereport {report_json_fn} html_report --prefix={self.base_dir}',
+            ['codereport', '--prefix', self.base_dir, report_json_fn, 'html_report'],
             log_stream=log_fs,
             cwd=output_dir,
             ignore_error='AssertionError: No existing files found',
+            expect_returncode=[0, 1],
         )
         if known_issue:
             log_fs.write('No issue found\n')

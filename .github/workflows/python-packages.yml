@@ -46,7 +46,7 @@ jobs:
           cd $IDF_PATH
           idf_tools.py install xtensa-clang
           source ./export.sh
-          wget https://raw.githubusercontent.com/espressif/llvm-project/xtensa_release_12.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
+          wget https://raw.githubusercontent.com/espressif/llvm-project/xtensa_release_15.x/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
           chmod +x run-clang-tidy.py
         shell: bash
       - name: Test
@@ -56,6 +56,10 @@ jobs:
           cd examples/get-started/hello_world
           idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py
           idf.py clang-html-report
+          # Regression tests
+          idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py --run-clang-tidy-options "-h"
+          clang-tidy -dump-config >.clang-tidy
+          idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py --run-clang-tidy-options "-config-file .clang-tidy"
         shell: bash
       - uses: actions/upload-artifact@v2
         if: failure()

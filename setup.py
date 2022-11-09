@@ -27,7 +27,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     python_requires='>=3.6',
     extras_require={
-        'html': ['codereport~=0.2.5', 'jinja2<3.1'],
+        'html': ['codereport~=0.2.5', 'pygments<2.12'],
     },
     classifiers=[
         'Programming Language :: Python',
@@ -36,6 +36,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3 :: Only',
         'Operating System :: OS Independent',
         'License :: OSI Approved :: MIT License',
