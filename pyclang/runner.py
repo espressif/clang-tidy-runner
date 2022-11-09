@@ -312,6 +312,8 @@ class Runner:
         cmd = [
             sys.executable,
             self.run_clang_tidy_py,
+            '-p',
+            self.build_dir,
         ]
         if self.clang_extra_args:
             cmd.extend(shlex.split(self.clang_extra_args))
@@ -321,11 +323,7 @@ class Runner:
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             run_cmd(
-                cmd,
-                log_stream=log_fs,
-                stream=fw,
-                cwd=os.path.join(folder, self.build_dir),
-                expect_returncode=[0, 1],
+                cmd, log_stream=log_fs, stream=fw, cwd=folder, expect_returncode=[0, 1]
             )
 
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
