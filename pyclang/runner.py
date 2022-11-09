@@ -117,10 +117,9 @@ class Runner:
         self.xtensa_include_dir = xtensa_include_dirs
 
         # run_clang_tidy arguments
-        if os.path.isfile(os.path.realpath(run_clang_tidy_py)):
-            self.run_clang_tidy_py = os.path.realpath(run_clang_tidy_py)
-        else:
-            self.run_clang_tidy_py = run_clang_tidy_py
+        self._run_clang_tidy_py = run_clang_tidy_py
+        self._checked_run_clang_tidy_py = False
+
         self.check_files_regex = check_files_regex if check_files_regex else ['.*']
         self.clang_extra_args = clang_extra_args
 
@@ -132,6 +131,23 @@ class Runner:
             setattr(self, str(k), v)
 
         self._call_chain = []
+
+    @property
+    def run_clang_tidy_py(self):
+        if not self._checked_run_clang_tidy_py:
+            if os.path.isfile(os.path.realpath(self._run_clang_tidy_py)):
+                self._run_clang_tidy_py = os.path.realpath(self._run_clang_tidy_py)
+            else:
+                # check if executable is in PATH
+                self._run_clang_tidy_py = shutil.which(self._run_clang_tidy_py)
+                if not self.run_clang_tidy_py:
+                    raise FileNotFoundError(
+                        f'{self._run_clang_tidy_py} not found in your PATH'
+                    )
+
+            self._checked_run_clang_tidy_py = True
+
+        return self._run_clang_tidy_py
 
     def _run(self, folder, log_fs, output_dir):
         for func in self._call_chain:
@@ -297,11 +313,6 @@ class Runner:
                 stream=fw,
                 cwd=os.path.join(folder, self.build_dir),
             )
-
-        with open(warn_file) as fr:
-            first_line = fr.readline()
-            if 'Enabled checks' not in first_line:
-                raise ValueError(first_line)
 
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
 
