@@ -397,7 +397,8 @@ class Runner:
             from codereport import ReportItem
         except ImportError:
             log_fs.write(
-                'Please run `pip install codereport` to install this optional dependency for this feature'
+                'Please run `pip install "pyclang[html]"'
+                'to install this optional dependency for this feature'
             )
             sys.exit(1)
 
