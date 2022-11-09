@@ -5,7 +5,8 @@ import shutil
 import sys
 from datetime import datetime
 from functools import wraps
-from typing import List, Dict, Optional, TextIO
+
+import typing as t
 
 from .utils import to_path, run_cmd
 
@@ -14,10 +15,6 @@ def _remove_prefix(s: str, prefix: str) -> str:
     while s.startswith(prefix):
         s = s[len(prefix) :]
     return s
-
-
-class KnownIssue(Exception):
-    """KnownIssue"""
 
 
 class Runner:
@@ -31,8 +28,9 @@ class Runner:
     all related other params should be passed by ``__init__`` function to the Runner itself
     """
 
-    # clang-tidy warnings format:      FILE_PATH:LINENO:COL: SEVERITY: MSG [ERROR IDENTIFIER]
     CLANG_TIDY_REGEX = re.compile(
+        # clang-tidy warnings format:
+        # FILE_PATH:  LINENO:  COL:SEVERITY:MSG [ERROR IDENTIFIER]
         r'([\w/.\- ]+):(\d+):(\d+): (.+): (.+) \[([\w\-,.]+)]'
     )
     WARN_FILENAME = 'warnings.txt'
@@ -68,22 +66,22 @@ class Runner:
 
     def __init__(
         self,
-        dirs: List[str],
+        dirs: t.List[str],
         cores: int = os.cpu_count(),
         # general arguments
         build_dir: str = 'build',
-        output_path: Optional[str] = None,
-        log_path: Optional[str] = None,
+        output_path: t.Optional[str] = None,
+        log_path: t.Optional[str] = None,
         # filter arguments
         all_files: bool = True,
-        include_paths: Optional[List[str]] = None,
-        exclude_paths: Optional[List[str]] = None,
-        ignore_clang_checks: Optional[List[str]] = None,
-        checks_limitations: Optional[Dict[str, int]] = None,
-        xtensa_include_dirs: Optional[str] = None,
+        include_paths: t.Optional[t.List[str]] = None,
+        exclude_paths: t.Optional[t.List[str]] = None,
+        ignore_clang_checks: t.Optional[t.List[str]] = None,
+        checks_limitations: t.Optional[t.Dict[str, int]] = None,
+        xtensa_include_dirs: t.Optional[str] = None,
         # run_clang_tidy related
         run_clang_tidy_py: str = 'run-clang-tidy.py',
-        check_files_regex: Optional[List[str]] = None,
+        check_files_regex: t.Optional[t.List[str]] = None,
         clang_extra_args: str = (
             r'-header-filter=".*\..*" '
             r'-checks="-*,clang-analyzer-core.NullDereference,clang-analyzer-unix.*,bugprone-*,'
@@ -187,7 +185,7 @@ class Runner:
 
         return wrapper
 
-    def get_check_warn_file(self, log_fs: TextIO, output_dir: str) -> str:
+    def get_check_warn_file(self, log_fs: t.TextIO, output_dir: str) -> str:
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
         if not os.path.isfile(warn_file):
             log_fs.write(
@@ -198,7 +196,7 @@ class Runner:
         return warn_file
 
     @chain
-    def idf_reconfigure(self, *args) -> 'Runner':
+    def idf_reconfigure(self, *args):
         """
         Run "idf.py reconfigure" to get the compiled commands
         """

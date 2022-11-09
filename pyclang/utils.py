@@ -3,14 +3,15 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import TextIO, Optional, AnyStr
+
+import typing as t
 
 
 def to_path(*args: str) -> Path:
     return Path(os.path.join(*args)).resolve()
 
 
-def to_str(bytes_str: AnyStr) -> str:
+def to_str(bytes_str: t.AnyStr) -> str:
     if isinstance(bytes_str, bytes):
         return bytes_str.decode('utf-8', errors='ignore')
     return bytes_str
@@ -22,11 +23,11 @@ class KnownIssue(Exception):
 
 def run_cmd(
     cmd: str,
-    log_stream: TextIO = sys.stdout,
-    stream: TextIO = sys.stdout,
-    ignore_error: Optional[str] = None,
+    log_stream: t.TextIO = sys.stdout,
+    stream: t.TextIO = sys.stdout,
+    ignore_error: t.Optional[str] = None,
     **kwargs,
-) -> Optional[KnownIssue]:
+) -> t.Optional[KnownIssue]:
     log_stream.write('run command: ' + cmd + '\n')
     with tempfile.NamedTemporaryFile() as fw:
         # set stdout and stderr both to subprocess.PIPE may cause deadlock
