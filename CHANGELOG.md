@@ -1,3 +1,12 @@
+## v0.2.2 (2022-11-09)
+
+### Fix
+
+- update dependency  for codereport related packages
+- run clang-tidy check at the src folder instead of build dir
+- stop using `shell=True` for subprocess.Popen
+- check if `run-clang-tidy.py` exists while calling, not raise ValueError if not found "Enabled checks"
+
 ## v0.2.1 (2022-09-16)
 
 ### Fix
