@@ -1,3 +1,9 @@
+## v0.2.3 (2023-02-17)
+
+### Fix
+
+- use real path when calling idf.py
+
 ## v0.2.2 (2022-11-09)
 
 ### Fix
