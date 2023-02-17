@@ -12,13 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.6', '3.10' ]
+        python-version: [ '3.6', '3.11' ]
+    container: python:${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v3
       - name: Build all packages
         run: |
           pip install wheel
@@ -27,12 +24,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [latest, release-v4.4]
+        include:
+          - version: latest
+            tool_name: esp-clang
+          - version: release-v4.4
+            tool_name: xtensa-clang
     container: espressif/idf:${{ matrix.version }}
     steps:
       - name: workaround permission issue
         run: git config --global --add safe.directory /__w/clang-tidy-runner/clang-tidy-runner
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Prepare
         run: |
           repo=$(pwd)
@@ -44,7 +45,7 @@ jobs:
           pip install -e ".[html]"
           # go to idf path and install the other stuffs
           cd $IDF_PATH
-          idf_tools.py install xtensa-clang
+          idf_tools.py install ${{ matrix.tool_name }}
           source ./export.sh
           wget https://raw.githubusercontent.com/espressif/llvm-project/xtensa_release_15.x/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
           chmod +x run-clang-tidy.py
