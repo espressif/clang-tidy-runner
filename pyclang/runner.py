@@ -18,6 +18,19 @@ def _remove_prefix(s: str, prefix: str) -> str:
     return s
 
 
+def _get_real_path(s: str) -> str:
+    # if s is a file
+    if os.path.isfile(os.path.realpath(s)):
+        return os.path.realpath(s)
+
+    # if s is an executable in $PATH
+    full_path = shutil.which(s)
+    if not full_path:
+        raise FileNotFoundError(f'{s} not found in your PATH')
+
+    return full_path
+
+
 class Runner:
     """
     Should be used with:
@@ -119,7 +132,6 @@ class Runner:
 
         # run_clang_tidy arguments
         self._run_clang_tidy_py = run_clang_tidy_py
-        self._checked_run_clang_tidy_py = False
 
         self.check_files_regex = check_files_regex if check_files_regex else ['.*']
         self.clang_extra_args = clang_extra_args
@@ -134,21 +146,12 @@ class Runner:
         self._call_chain = []
 
     @property
-    def run_clang_tidy_py(self):
-        if not self._checked_run_clang_tidy_py:
-            if os.path.isfile(os.path.realpath(self._run_clang_tidy_py)):
-                self._run_clang_tidy_py = os.path.realpath(self._run_clang_tidy_py)
-            else:
-                # check if executable is in PATH
-                self._run_clang_tidy_py = shutil.which(self._run_clang_tidy_py)
-                if not self.run_clang_tidy_py:
-                    raise FileNotFoundError(
-                        f'{self._run_clang_tidy_py} not found in your PATH'
-                    )
+    def idf_py(self) -> str:
+        return _get_real_path('idf.py')
 
-            self._checked_run_clang_tidy_py = True
-
-        return self._run_clang_tidy_py
+    @property
+    def run_clang_tidy_py(self) -> str:
+        return _get_real_path(self._run_clang_tidy_py)
 
     def _run(self, folder, log_fs, output_dir):
         for func in self._call_chain:
@@ -221,7 +224,7 @@ class Runner:
         log_fs = args[1]
 
         run_cmd(
-            ['idf.py', '-B', self.build_dir, 'reconfigure'],
+            [sys.executable, self.idf_py, '-B', self.build_dir, 'reconfigure'],
             log_stream=log_fs,
             cwd=folder,
         )
