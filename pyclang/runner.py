@@ -9,7 +9,7 @@ from functools import wraps
 
 import typing as t
 
-from .utils import to_path, run_cmd
+from .utils import to_path, run_cmd, to_realpath
 
 
 def _remove_prefix(s: str, prefix: str) -> str:
@@ -18,17 +18,26 @@ def _remove_prefix(s: str, prefix: str) -> str:
     return s
 
 
-def _get_real_path(s: str) -> str:
+def _is_exe(filepath: str) -> bool:
+    if sys.platform == 'win32' and os.path.splitext(filepath)[-1].lower() == '.exe':
+        return True
+
+    return False
+
+
+def _get_call_cmd(filepath: str) -> t.List[str]:
+    realpath = to_realpath(filepath)
+
     # if s is a file
-    if os.path.isfile(os.path.realpath(s)):
-        return os.path.realpath(s)
+    if os.path.isfile(realpath):
+        return [realpath] if _is_exe(realpath) else [sys.executable, realpath]
 
     # if s is an executable in $PATH
-    full_path = shutil.which(s)
-    if not full_path:
-        raise FileNotFoundError(f'{s} not found in your PATH')
+    fullpath = shutil.which(filepath)
+    if not fullpath:
+        raise FileNotFoundError(f'{filepath} not found in your PATH')
 
-    return full_path
+    return [fullpath] if _is_exe(fullpath) else [sys.executable, fullpath]
 
 
 class Runner:
@@ -146,12 +155,12 @@ class Runner:
         self._call_chain = []
 
     @property
-    def idf_py(self) -> str:
-        return _get_real_path('idf.py')
+    def idf_py_cmd(self) -> t.List[str]:
+        return _get_call_cmd('idf.py')
 
     @property
-    def run_clang_tidy_py(self) -> str:
-        return _get_real_path(self._run_clang_tidy_py)
+    def run_clang_tidy_py_cmd(self) -> t.List[str]:
+        return _get_call_cmd(self._run_clang_tidy_py)
 
     def _run(self, folder, log_fs, output_dir):
         for func in self._call_chain:
@@ -224,7 +233,7 @@ class Runner:
         log_fs = args[1]
 
         run_cmd(
-            [sys.executable, self.idf_py, '-B', self.build_dir, 'reconfigure'],
+            self.idf_py_cmd + ['-B', self.build_dir, 'reconfigure'],
             log_stream=log_fs,
             cwd=folder,
         )
@@ -312,9 +321,7 @@ class Runner:
 
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
 
-        cmd = [
-            sys.executable,
-            self.run_clang_tidy_py,
+        cmd = self.run_clang_tidy_py_cmd + [
             '-p',
             self.build_dir,
         ]

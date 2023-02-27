@@ -8,7 +8,11 @@ import typing as t
 
 
 def to_path(*args: str) -> Path:
-    return Path(os.path.join(*args)).resolve()
+    return Path(os.path.expanduser(os.path.join(*args))).resolve()
+
+
+def to_realpath(filepath: str) -> str:
+    return os.path.realpath(os.path.expanduser(filepath))
 
 
 def to_str(bytes_str: t.AnyStr) -> str:
