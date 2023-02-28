@@ -28,3 +28,7 @@ MANIFEST
 # IDE / editor
 .vscode/
 .idea/
+
+
+# venv
+.venv/
