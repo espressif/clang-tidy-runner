@@ -154,6 +154,10 @@ class Runner:
 
         self._call_chain = []
 
+        self.expect_returncode = [0]
+        if not kwargs.get('exit_code', False):
+            self.expect_returncode.append(1)
+
     @property
     def idf_py_cmd(self) -> t.List[str]:
         return _get_call_cmd('idf.py')
@@ -333,7 +337,11 @@ class Runner:
         with open(warn_file, 'w') as fw:
             # clang-tidy would return 1 when found issue, ignore this return code
             run_cmd(
-                cmd, log_stream=log_fs, stream=fw, cwd=folder, expect_returncode=[0, 1]
+                cmd,
+                log_stream=log_fs,
+                stream=fw,
+                cwd=folder,
+                expect_returncode=self.expect_returncode,
             )
 
         log_fs.write(f'clang-tidy report generated: {warn_file}\n')
@@ -445,7 +453,7 @@ class Runner:
             log_stream=log_fs,
             cwd=output_dir,
             ignore_error='AssertionError: No existing files found',
-            expect_returncode=[0, 1],
+            expect_returncode=self.expect_returncode,
         )
         if known_issue:
             log_fs.write('No issue found\n')

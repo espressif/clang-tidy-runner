@@ -21,6 +21,11 @@ common_args.add_argument(
     type=os.path.realpath,
     help='where the log files will be write to. will use stdout if not specified',
 )
+common_args.add_argument(
+    '--exit-code',
+    action='store_true',
+    help='Exit with code based on the results of the code analysis. By default, exit code reflects the success of running the tool only.',
+)
 
 idf_specific_args = argparse.ArgumentParser(add_help=False)
 idf_specific_args.add_argument(

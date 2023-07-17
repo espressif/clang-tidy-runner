@@ -64,6 +64,12 @@ def action_extensions(base_actions, project_path):
                         'help': 'exclude extra files besides of the project dir. '
                         'This option can be used for multiple times.',
                     },
+                    {
+                        'names': ['--exit-code'],
+                        'help': 'Exit with code based on the results of the code analysis. '
+                        'By default, exit code reflects the success of running the tool only.',
+                        'is_flag': True,
+                    },
                 ],
             },
             'clang-html-report': {
