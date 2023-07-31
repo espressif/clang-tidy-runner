@@ -1,3 +1,13 @@
+## v0.3.0 (2023-07-31)
+
+### Feat
+
+- add support for '--exit-code' flag
+
+### Fix
+
+- call exe file directly
+
 ## v0.2.3 (2023-02-17)
 
 ### Fix
