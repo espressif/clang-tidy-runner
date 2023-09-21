@@ -446,6 +446,10 @@ class Runner:
 
             res.append(ReportItem(path, line, severity, msg, code, col).dict())
 
+        if not res:
+            log_fs.write('No issue found\n')
+            return
+
         report_json_fn = os.path.join(output_dir, 'report.json')
         with open(report_json_fn, 'w') as fw:
             json.dump(res, fw, indent=2)
