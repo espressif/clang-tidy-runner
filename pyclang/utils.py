@@ -66,3 +66,9 @@ def run_cmd(
         sys.stderr.write(
             f'command "{cmd_str}" gives the following warnings with exitcode {returncode}:\n{raw_stderr}\n'
         )
+
+    return returncode
+
+
+class FileNotFoundSystemExit(SystemExit):
+    """System Exit for FileNotFoundError"""
