@@ -9,7 +9,7 @@ from functools import wraps
 
 import typing as t
 
-from .utils import to_path, run_cmd, to_realpath
+from .utils import to_path, run_cmd, to_realpath, FileNotFoundSystemExit
 
 
 def _remove_prefix(s: str, prefix: str) -> str:
@@ -35,7 +35,7 @@ def _get_call_cmd(filepath: str) -> t.List[str]:
     # if s is an executable in $PATH
     fullpath = shutil.which(filepath)
     if not fullpath:
-        raise FileNotFoundError(f'{filepath} not found in your PATH')
+        raise FileNotFoundSystemExit(f'{filepath} not found in your PATH')
 
     return [fullpath] if _is_exe(fullpath) else [sys.executable, fullpath]
 
@@ -103,7 +103,7 @@ class Runner:
         checks_limitations: t.Optional[t.Dict[str, int]] = None,
         xtensa_include_dirs: t.Optional[str] = None,
         # run_clang_tidy related
-        run_clang_tidy_py: str = 'run-clang-tidy.py',
+        run_clang_tidy_py: t.Optional[str] = None,
         check_files_regex: t.Optional[t.List[str]] = None,
         clang_extra_args: str = (
             r'-header-filter=".*\..*" '
@@ -164,7 +164,13 @@ class Runner:
 
     @property
     def run_clang_tidy_py_cmd(self) -> t.List[str]:
-        return _get_call_cmd(self._run_clang_tidy_py)
+        if self._run_clang_tidy_py:
+            return _get_call_cmd(self._run_clang_tidy_py)
+        else:
+            try:
+                return _get_call_cmd('run-clang-tidy')
+            except FileNotFoundSystemExit:
+                return _get_call_cmd('run-clang-tidy.py')
 
     def _run(self, folder, log_fs, output_dir):
         for func in self._call_chain:
@@ -439,6 +445,10 @@ class Runner:
                 continue
 
             res.append(ReportItem(path, line, severity, msg, code, col).dict())
+
+        if not res:
+            log_fs.write('No issue found\n')
+            return
 
         report_json_fn = os.path.join(output_dir, 'report.json')
         with open(report_json_fn, 'w') as fw:
