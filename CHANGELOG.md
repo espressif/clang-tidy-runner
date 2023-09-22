@@ -1,3 +1,13 @@
+## v0.4.0 (2023-09-22)
+
+### Feat
+
+- support default value run-clang-tidy as well
+
+### Fix
+
+- skip writing report.json and html reports when there's no issue
+
 ## v0.3.0 (2023-07-31)
 
 ### Feat
