@@ -96,7 +96,7 @@ class Runner:
         output_path: t.Optional[str] = None,
         log_path: t.Optional[str] = None,
         # filter arguments
-        all_files: bool = True,
+        all_files: bool = False,
         include_paths: t.Optional[t.List[str]] = None,
         exclude_paths: t.Optional[t.List[str]] = None,
         ignore_clang_checks: t.Optional[t.List[str]] = None,
