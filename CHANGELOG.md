@@ -1,3 +1,9 @@
+## v0.4.1 (2023-09-27)
+
+### Fix
+
+- check project files only by default
+
 ## v0.4.0 (2023-09-22)
 
 ### Feat
