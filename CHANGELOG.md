@@ -1,3 +1,9 @@
+## v0.4.2 (2023-10-16)
+
+### Fix
+
+- **idf_extension**: Don't override the clang_extra_args with empty string if not specified
+
 ## v0.4.1 (2023-09-27)
 
 ### Fix
