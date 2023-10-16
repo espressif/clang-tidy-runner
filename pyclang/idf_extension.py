@@ -6,8 +6,7 @@ from pyclang import Runner
 def action_extensions(base_actions, project_path):
     def call_runner(subcommand_name, ctx, args, **kwargs):
         # idf extension don't need default values
-        kwargs['clang_extra_args'] = kwargs.pop('run_clang_tidy_options', '') or ''
-
+        kwargs['clang_extra_args'] = kwargs.pop('run_clang_tidy_options', None)
         kwargs['check_files_regex'] = kwargs.pop('patterns', None)
 
         useful_kwargs = {k: v for k, v in kwargs.items() if v is not None}
