@@ -1,24 +1,38 @@
-name: Upload Python Package
+# This workflow will upload the pyclang Python package when a release is created
+
+name: PyPI release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [released]
 
 jobs:
-  deploy:
+  build_and_upload:
     runs-on: ubuntu-latest
-    container: python:3.6
     steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install wheel twine
-      - name: Build packages
-        run: python setup.py sdist bdist_wheel
-      - name: Publish packages
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: python -m twine upload --verbose dist/* || res=1
+    - uses: actions/checkout@master
+    - name: Set up Python 3.7
+      uses: actions/setup-python@master
+      with:
+        python-version: '3.7'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    - name: Build and upload pyclang ${{ github.event.release.tag_name }}
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        PUBLISHED_VERSION=$(curl https://pypi.org/pypi/pyclang/json 2>/dev/null | jq -r '.info.version')
+        CURRENT_VERSION=$(python setup.py --version 2>/dev/null)
+
+        if [ "$PUBLISHED_VERSION" == "$CURRENT_VERSION" ]; then
+          echo "Version ${PUBLISHED_VERSION} already published, skipping..."
+          exit 1
+        else
+          echo "Packaging and publishing new pyclang version: ${CURRENT_VERSION}"
+          python setup.py sdist bdist_wheel
+          tar -ztvf dist/*
+          twine upload --verbose dist/*
+        fi

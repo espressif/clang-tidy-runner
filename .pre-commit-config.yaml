@@ -25,9 +25,11 @@ repos:
       - id: black
         exclude: failure_reason.py
         args: [ '--skip-string-normalization' ]
-  - hooks:
-      - id: commitizen
-        stages:
-          - commit-msg
-    repo: https://github.com/commitizen-tools/commitizen
-    rev: v2.37.0
+  - repo: https://github.com/espressif/conventional-precommit-linter
+    rev: v1.4.0
+    hooks:
+      - id: conventional-precommit-linter
+        stages: [commit-msg]
+        args: ['--types=change,ci,docs,feat,fix,refactor,remove,revert,test,perf']
+default_stages: [commit]
+default_install_hook_types: [pre-commit, commit-msg]
