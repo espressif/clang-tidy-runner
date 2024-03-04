@@ -3,3 +3,20 @@
 name = "cz_conventional_commits"
 version = "0.4.2"
 tag_format = "v$version"
+update_changelog_on_bump = true
+changelog_merge_prerelease = true
+annotated_tag = true
+bump_message = "change: Update version to $new_version"
+change_type_order = [
+    "BREAKING CHANGE",
+    "New Features",
+    "Bug Fixes",
+    "Code Refactoring",
+    "Performance Improvements"
+]
+
+[tool.commitizen.change_type_map]
+feat = "New Features"
+fix = "Bug Fixes"
+refactor = "Code Refactoring"
+perf = "Performance Improvements"
