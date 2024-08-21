@@ -1,9 +1,28 @@
 import os.path
+import sys
 
 from pyclang import Runner
 
 
 def action_extensions(base_actions, project_path):
+    def get_toolchain(args):
+        cache_path = os.path.join(args.build_dir, 'CMakeCache.txt')
+        if not os.path.exists(cache_path):
+            return None
+        with open(cache_path, encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('IDF_TOOLCHAIN:STRING='):
+                    return line.split('=', maxsplit=1)[1].strip()
+        return None
+
+    def check_clang_toolchain(subcommand_name, args):
+        toolchain = get_toolchain(args)
+        if not toolchain or toolchain == 'clang':
+            return
+        print((f'WARNING: clang action "{subcommand_name}" is intended for use '
+               f'with "IDF_TOOLCHAIN" set to "clang", but the current toolchain is '
+               f'set to "{toolchain}".'), file=sys.stderr)
+
     def call_runner(subcommand_name, ctx, args, **kwargs):
         # idf extension don't need default values
         kwargs['clang_extra_args'] = kwargs.pop('run_clang_tidy_options', None)
@@ -22,6 +41,9 @@ def action_extensions(base_actions, project_path):
             runner.make_html_report()
 
         runner()
+
+        # Display a warning if the extension was launched for a project using a toolchain other than clang.
+        check_clang_toolchain(subcommand_name, args)
 
     return {
         'actions': {
