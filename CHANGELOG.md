@@ -1,3 +1,9 @@
+## v0.5.0 (2024-09-02)
+
+### New Features
+
+- add warning for ESP-IDF actions if IDF_TOOLCHAIN is not set to clang
+
 ## v0.4.2 (2023-10-16)
 
 ### Fix
