@@ -12,13 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.6', '3.11' ]
+        python-version: [ '3.7', '3.12' ]
     container: python:${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v3
       - name: Build all packages
         run: |
-          pip install wheel
+          pip install wheel setuptools
           python setup.py sdist bdist_wheel
   idf_test:
     runs-on: ubuntu-latest
@@ -27,7 +27,7 @@ jobs:
         include:
           - version: latest
             tool_name: esp-clang
-          - version: release-v4.4
+          - version: release-v5.0
             tool_name: xtensa-clang
     container: espressif/idf:${{ matrix.version }}
     steps:
