@@ -27,7 +27,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     python_requires='>=3.7',
     extras_require={
-        'html': ['codereport~=0.2.5', 'pygments<2.12'],
+        'html': ['codereport~=0.4'],
     },
     classifiers=[
         'Programming Language :: Python',
