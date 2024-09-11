@@ -15,7 +15,7 @@ jobs:
         python-version: [ '3.7', '3.12' ]
     container: python:${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build all packages
         run: |
           pip install wheel setuptools
@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: workaround permission issue
         run: git config --global --add safe.directory /__w/clang-tidy-runner/clang-tidy-runner
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare
         run: |
           repo=$(pwd)
@@ -62,7 +62,7 @@ jobs:
           clang-tidy -dump-config >.clang-tidy
           idf.py clang-check --run-clang-tidy-py $IDF_PATH/run-clang-tidy.py --run-clang-tidy-options "-config-file .clang-tidy"
         shell: bash
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test_logs
