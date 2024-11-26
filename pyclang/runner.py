@@ -6,6 +6,7 @@ import sys
 import shlex
 from datetime import datetime
 from functools import wraps
+from functools import lru_cache
 
 import typing as t
 
@@ -25,12 +26,26 @@ def _is_exe(filepath: str) -> bool:
     return False
 
 
+# Modify PATHEXT only once
+@lru_cache(maxsize=None)
+def _pathext_adjusted_win():
+    os.environ['PATHEXT'] += os.pathsep
+    os.environ['PATHEXT'] += '.'
+
+
 def _get_call_cmd(filepath: str) -> t.List[str]:
     realpath = to_realpath(filepath)
 
     # if s is a file
     if os.path.isfile(realpath):
         return [realpath] if _is_exe(realpath) else [sys.executable, realpath]
+
+    # On Win function shutil.which() appends all possible extensions from variable PATHEXT. 
+    # Since some commands like `run-clang-tidy` does not have extension, the location failed.
+    # By adding `.` into the PATHEXT, we ensure that files without extension are searched as well.
+    # This applies up to python 3.11. In Python 3.12 files without extension can be found with shutil.which().
+    if sys.platform == 'win32':
+        _pathext_adjusted_win()
 
     # if s is an executable in $PATH
     fullpath = shutil.which(filepath)
