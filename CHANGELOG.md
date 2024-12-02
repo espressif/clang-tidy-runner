@@ -1,3 +1,14 @@
+## v0.6.0 (2024-12-02)
+
+### New Features
+
+- drop support for ESP-IDF v4.4 and Python 3.6
+
+### Bug Fixes
+
+- Windows - run-clang-tidy.py not found in your PATH
+- update codereport version to allow usage of pygments 2.12+
+
 ## v0.5.0 (2024-09-02)
 
 ### New Features
