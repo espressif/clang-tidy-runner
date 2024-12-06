@@ -66,11 +66,16 @@ class Runner:
     all related other params should be passed by ``__init__`` function to the Runner itself
     """
 
-    CLANG_TIDY_REGEX = re.compile(
-        # clang-tidy warnings format:
+    CLANG_TIDY_WARNING_REGEX = re.compile(
         # FILE_PATH:  LINENO:  COL:SEVERITY:MSG [ERROR IDENTIFIER]
         r'([\w/.\- ]+):(\d+):(\d+): (.+): (.+) \[([\w\-,.]+)]'
     )
+
+    CLANG_TIDY_PATH_REGEX = re.compile(
+        # FILE_PATH:  LINENO:  COL:SEVERITY:
+        r'([\w/.\- ]+):(\d+):(\d+): (.+):'
+    )
+
     WARN_FILENAME = 'warnings.txt'
     COMPILE_COMMANDS_FILENAME = 'compile_commands.json'
 
@@ -380,7 +385,7 @@ class Runner:
         with open(warn_file) as fr:
             warnings_str = fr.read()
         res = {check: [] for check in self.checks_limitations.keys()}
-        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(
+        for path, line, col, severity, msg, code in self.CLANG_TIDY_WARNING_REGEX.findall(
             warnings_str
         ):
             if code not in res:  # error identifier not in limit field
@@ -446,7 +451,7 @@ class Runner:
             warnings_str = fr.read()
 
         res = []
-        for path, line, col, severity, msg, code in self.CLANG_TIDY_REGEX.findall(
+        for path, line, col, severity, msg, code in self.CLANG_TIDY_WARNING_REGEX.findall(
             warnings_str
         ):
             if self.ignore_clang_checks and any(
@@ -501,7 +506,7 @@ class Runner:
 
         with open(warn_file, 'w') as fw:
             for line in warnings:
-                result = self.CLANG_TIDY_REGEX.match(line)
+                result = self.CLANG_TIDY_PATH_REGEX.match(line)
                 if result:
                     path = result.group(1)
                     norm_path = os.path.relpath(
@@ -510,8 +515,7 @@ class Runner:
                     # if still have ../, then it's a system file, should not in idf path
                     if '../' in norm_path:
                         norm_path = '/' + _remove_prefix(norm_path, '../')
-                    else:
-                        norm_path = norm_path
+
                     line = line.replace(path, norm_path)
                 fw.write(line)
         log_fs.write(f'Normalized file {warn_file}\n')
