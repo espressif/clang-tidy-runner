@@ -39,6 +39,8 @@ jobs:
           repo=$(pwd)
           # the workflow may change a bit after idf.py pull this in
           cp ./pyclang/idf_extension.py $IDF_PATH/tools/idf_py_actions/temp_ext.py
+          # run install.sh again
+          bash $IDF_PATH/install.sh
           # use idf python env
           source $IDF_PATH/export.sh
           # install this package
