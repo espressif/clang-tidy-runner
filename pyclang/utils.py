@@ -55,9 +55,11 @@ def run_cmd(
     returncode = p.wait()
     raw_stderr = to_str(p.stderr.read())
     if returncode not in expect_returncode:
-        sys.stderr.write(raw_stderr)
+        sys.stderr.write(f'\nERROR: Command "{cmd_str}" failed with exit code {returncode}\n')
+        if raw_stderr:
+            sys.stderr.write(f'Details:\n{raw_stderr}\n')
         sys.stderr.flush()
-        raise RuntimeError(f'command "{cmd_str}" failed with exitcode {returncode}')
+        raise SystemExit(returncode)
 
     if raw_stderr:
         if ignore_error and ignore_error in raw_stderr:

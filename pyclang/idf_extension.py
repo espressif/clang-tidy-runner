@@ -1,7 +1,17 @@
 import os.path
 import sys
-
+import shutil
 from pyclang import Runner
+
+def check_esp_clang():
+    clang_path = shutil.which("clang-tidy")
+    # xtensa is used only till ESP-IDF v5.0
+    if not clang_path or not any(sub in clang_path for sub in ('esp-clang', 'xtensa-esp32-elf-clang')):
+        raise SystemExit(
+            'ERROR: Espressif Clang was not found on the system.\n\n'
+            'For installation instructions, open the documentation with:\n'
+            'idf.py docs --starting-page=api-guides/tools/idf-clang-tidy.html'
+        )
 
 
 def action_extensions(base_actions, project_path):
@@ -24,6 +34,8 @@ def action_extensions(base_actions, project_path):
                f'set to "{toolchain}".'), file=sys.stderr)
 
     def call_runner(subcommand_name, ctx, args, **kwargs):
+        check_esp_clang()
+
         # idf extension don't need default values
         kwargs['clang_extra_args'] = kwargs.pop('run_clang_tidy_options', None)
         kwargs['check_files_regex'] = kwargs.pop('patterns', None)
