@@ -43,7 +43,7 @@ def action_extensions(base_actions, project_path):
         useful_kwargs = {k: v for k, v in kwargs.items() if v is not None}
         runner = Runner(
             [args.project_dir],
-            build_dir=os.path.basename(args.build_dir),
+            build_dir=args.build_dir,
             **useful_kwargs
         )
 
