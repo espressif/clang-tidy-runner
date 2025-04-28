@@ -1,3 +1,12 @@
+## v0.6.1 (2025-04-28)
+
+### Bug Fixes
+
+- respect build directory in idf extension
+- Remove printed traceback in case of failure
+- check Espressif clang on system
+- normalize path regex
+
 ## v0.6.0 (2024-12-02)
 
 ### New Features
