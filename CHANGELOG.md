@@ -1,3 +1,9 @@
+## v0.6.2 (2025-04-30)
+
+### Bug Fixes
+
+- publish_pypi - Set ubuntu to 24.04 and python to 3.13
+
 ## v0.6.1 (2025-04-28)
 
 ### Bug Fixes
