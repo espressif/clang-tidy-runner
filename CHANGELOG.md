@@ -1,3 +1,9 @@
+## v0.6.3 (2025-04-30)
+
+### Bug Fixes
+
+- publish_pypi - Added missing setuptool package
+
 ## v0.6.2 (2025-04-30)
 
 ### Bug Fixes
