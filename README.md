@@ -24,7 +24,6 @@ You can write custom chain method by using decorator `@chain`.
 Restrictions: all arguments are fixed, you need to pass the rest of them when initializing `Runner` instance with kwargs
 
 - `folder`: which is the folder you passed when initializing `Runner` instance
-- `log_fs`: file stream (if you provided `log_path`) or `sys.stdout`
 
 ```python
 import os
@@ -43,10 +42,6 @@ runner = Runner([os.path.join(os.environ['IDF_PATH'], 'examples', 'get-started',
 runner.hello().idf_reconfigure()
 runner()
 ```
-
-## CLI Extension
-
-For each custom chain method, you should also define this in `cli_ext.py` if there're additional arguments.
 
 ## Use as a script
 

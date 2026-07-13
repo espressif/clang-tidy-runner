@@ -1,14 +1,18 @@
 import os.path
-import sys
 import shutil
+
+from esp_pylib.errors import FatalError
+from esp_pylib.logger import log
+from rich.markup import escape
+
 from pyclang import Runner
 
 def check_esp_clang():
     clang_path = shutil.which("clang-tidy")
     # xtensa is used only till ESP-IDF v5.0
     if not clang_path or not any(sub in clang_path for sub in ('esp-clang', 'xtensa-esp32-elf-clang')):
-        raise SystemExit(
-            'ERROR: Espressif Clang was not found on the system.\n\n'
+        log.die(
+            'Espressif Clang was not found on the system.\n\n'
             'For installation instructions, open the documentation with:\n'
             'idf.py docs --starting-page=api-guides/tools/idf-clang-tidy.html'
         )
@@ -29,9 +33,11 @@ def action_extensions(base_actions, project_path):
         toolchain = get_toolchain(args)
         if not toolchain or toolchain == 'clang':
             return
-        print((f'WARNING: clang action "{subcommand_name}" is intended for use '
-               f'with "IDF_TOOLCHAIN" set to "clang", but the current toolchain is '
-               f'set to "{toolchain}".'), file=sys.stderr)
+        log.warn(
+            f'clang action "{escape(subcommand_name)}" is intended for use '
+            f'with "IDF_TOOLCHAIN" set to "clang", but the current toolchain is '
+            f'set to "{escape(toolchain)}".'
+        )
 
     def call_runner(subcommand_name, ctx, args, **kwargs):
         check_esp_clang()
@@ -47,12 +53,15 @@ def action_extensions(base_actions, project_path):
             **useful_kwargs
         )
 
-        if subcommand_name == 'clang-check':
-            runner.idf_reconfigure().filter_cmd().remove_command_flags().run_clang_tidy().remove_color_output()
-        elif subcommand_name == 'clang-html-report':
-            runner.make_html_report()
+        try:
+            if subcommand_name == 'clang-check':
+                runner.idf_reconfigure().filter_cmd().remove_command_flags().run_clang_tidy().remove_color_output()
+            elif subcommand_name == 'clang-html-report':
+                runner.make_html_report()
 
-        runner()
+            runner()
+        except FatalError as e:
+            log.die(escape(str(e)))
 
         # Display a warning if the extension was launched for a project using a toolchain other than clang.
         check_clang_toolchain(subcommand_name, args)
