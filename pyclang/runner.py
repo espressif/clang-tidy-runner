@@ -10,7 +10,11 @@ from functools import lru_cache
 
 import typing as t
 
-from .utils import to_path, run_cmd, to_realpath, FileNotFoundSystemExit
+from rich.markup import escape
+from esp_pylib.errors import FatalError
+from esp_pylib.logger import log
+
+from .utils import to_path, run_cmd, to_realpath, FileNotFoundSystemExit, KnownIssue
 
 
 def _remove_prefix(s: str, prefix: str) -> str:
@@ -62,7 +66,7 @@ class Runner:
     >> runner = runner.idf_configure().run_clang_tidy().normalize()
     >> runner()
 
-    could use ``@chain`` to add custom method, default arguments are (folder, log_fs), no need to pass manually.
+    could use ``@chain`` to add custom method, default arguments are (folder, output_dir), no need to pass manually.
     all related other params should be passed by ``__init__`` function to the Runner itself
     """
 
@@ -192,20 +196,23 @@ class Runner:
             except FileNotFoundSystemExit:
                 return _get_call_cmd('run-clang-tidy.py')
 
-    def _run(self, folder, log_fs, output_dir):
+    def _run(self, folder, output_dir):
         for func in self._call_chain:
-            func(folder, log_fs, output_dir)
+            func(folder, output_dir)
 
     def __call__(self):
         """
         Will auto pass the following arguments to all functions with `@chain` decorated.
         - folder: folder that need to run clang-tidy check
-        - log_fs: log file stream, would use sys.stdout when no `log_path` specified
         - output_dir: output folder
+
+        Pipeline trace output is routed via `log.set_console_options`: to a
+        per-folder log file when `--log-path` is set, otherwise to stdout.
         """
         for folder in self.dirs:
+            log_file = None
             if self.log_path:
-                log_fs = open(
+                log_file = open(
                     os.path.join(
                         self.log_path,
                         '{}_{}.log'.format(
@@ -215,15 +222,20 @@ class Runner:
                     ),
                     'w',
                 )
-            else:
-                log_fs = sys.stdout
+                log.set_console_options(file=log_file)
 
             if self.output_path:
                 output_dir = os.path.join(self.output_path, os.path.basename(folder))
                 os.makedirs(output_dir, exist_ok=True)
             else:
                 output_dir = folder
-            self._run(folder, log_fs, output_dir)
+
+            try:
+                self._run(folder, output_dir)
+            finally:
+                if log_file is not None:
+                    log_file.close()
+                log.set_console_options()
 
     def chain(func):
         """
@@ -244,13 +256,12 @@ class Runner:
 
         return wrapper
 
-    def get_check_warn_file(self, log_fs: t.TextIO, output_dir: str) -> str:
+    def get_check_warn_file(self, output_dir: str) -> str:
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
         if not os.path.isfile(warn_file):
-            log_fs.write(
-                f'{warn_file} not found. Please run clang-tidy to generate this file\n'
-            )
-            sys.exit(1)
+            msg = f'{warn_file} not found. Please run clang-tidy to generate this file'
+            log.print(escape(msg))
+            raise FatalError(msg)
 
         return warn_file
 
@@ -260,11 +271,9 @@ class Runner:
         Run "idf.py reconfigure" to get the compiled commands
         """
         folder = args[0]
-        log_fs = args[1]
 
         run_cmd(
             self.idf_py_cmd + ['-B', self.build_dir, 'reconfigure'],
-            log_stream=log_fs,
             cwd=folder,
         )
 
@@ -289,20 +298,19 @@ class Runner:
     @chain
     def filter_cmd(self, *args):
         folder = args[0]
-        log_fs = args[1]
 
-        log_fs.write('****** Filter files and dirs ******\n')
+        log.print('****** Filter files and dirs ******')
         if self.all_files:
-            log_fs.write('Including all files.\n')
+            log.print('Including all files.')
         else:
             if self.include_paths:
-                log_fs.write('Included paths:\n')
+                log.print('Included paths:')
                 for i in self.include_paths:
-                    log_fs.write(f'+ > {str(i)}\n')
+                    log.print(f'+ > {escape(str(i))}')
             if self.exclude_paths:
-                log_fs.write('Excluded paths:\n')
+                log.print('Excluded paths:')
                 for i in self.exclude_paths:
-                    log_fs.write(f'- > {str(i)}\n')
+                    log.print(f'- > {escape(str(i))}')
 
         out = []
         compiled_command_fp = os.path.join(
@@ -311,7 +319,7 @@ class Runner:
         with open(compiled_command_fp) as fr:
             commands = json.load(fr)
 
-        log_fs.write('Files to be analysed:\n')
+        log.print('Files to be analysed:')
         for command in commands:
             _file = to_path(command['file'])
             if _file.suffix == '.S':  # assembly file
@@ -337,17 +345,16 @@ class Runner:
                     continue
 
             out.append(command)
-            log_fs.write(f"+ > {command['file']}\n")
+            log.print(f"+ > {escape(command['file'])}")
 
         with open(compiled_command_fp, 'w') as fw:
             json.dump(out, fw)
-        log_fs.write(f'{"*" * 35}\n')
+        log.print('*' * 35)
 
     @chain
     def run_clang_tidy(self, *args):
         folder = args[0]
-        log_fs = args[1]
-        output_dir = args[2]
+        output_dir = args[1]
 
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
 
@@ -364,24 +371,22 @@ class Runner:
             # clang-tidy would return 1 when found issue, ignore this return code
             run_cmd(
                 cmd,
-                log_stream=log_fs,
                 stream=fw,
                 cwd=folder,
                 expect_returncode=self.expect_returncode,
             )
 
-        log_fs.write(f'clang-tidy report generated: {warn_file}\n')
+        log.print(f'clang-tidy report generated: {escape(warn_file)}')
 
     @chain
     def check_limits(self, *args):
-        log_fs = args[1]
-        output_dir = args[2]
+        output_dir = args[1]
 
         # if there's no limit in limit file, skip this process
         if not self.checks_limitations:
             return
 
-        warn_file = self.get_check_warn_file(log_fs, output_dir)
+        warn_file = self.get_check_warn_file(output_dir)
         with open(warn_file) as fr:
             warnings_str = fr.read()
         res = {check: [] for check in self.checks_limitations.keys()}
@@ -402,27 +407,22 @@ class Runner:
         for code, messages in res.items():
             strikes = len(messages) if messages else 0
             if strikes > self.checks_limitations[code]:
-                log_fs.write(
-                    f'{code}: Exceed limit: ({strikes} > {self.checks_limitations[code]})\n'
-                )
+                log.print(f'{escape(code)}: Exceed limit: ({strikes} > {self.checks_limitations[code]})')
                 passed = False
             else:
-                log_fs.write(
-                    f'{code}: Within limit: ({strikes} <= {self.checks_limitations[code]})\n'
-                )
+                log.print(f'{escape(code)}: Within limit: ({strikes} <= {self.checks_limitations[code]})')
 
             for message in messages:
-                log_fs.write(f'\t{message}\n')
+                log.print(f'\t{escape(message)}')
 
         if not passed:
-            sys.exit(1)
+            raise FatalError('Clang-tidy checks exceeded configured limits')
 
     @chain
     def remove_color_output(self, *args):
-        log_fs = args[1]
-        output_dir = args[2]
+        output_dir = args[1]
 
-        warn_file = self.get_check_warn_file(log_fs, output_dir)
+        warn_file = self.get_check_warn_file(output_dir)
         with open(warn_file) as fr:
             warnings_str = fr.read()
             warnings_str = self.ANSI_ESCAPE_REGEX.sub('', warnings_str)
@@ -430,23 +430,21 @@ class Runner:
         with open(warn_file, 'w') as fw:
             fw.write(warnings_str)
 
-        log_fs.write(f'color outputs in "{warn_file}" are eliminated.\n')
+        log.print(f'color outputs in "{escape(warn_file)}" are eliminated.')
 
     @chain
     def make_html_report(self, *args):
-        log_fs = args[1]
-        output_dir = args[2]
+        output_dir = args[1]
 
         try:
             from codereport import ReportItem
-        except ImportError:
-            log_fs.write(
-                'Please run `pip install "pyclang[html]"'
-                'to install this optional dependency for this feature'
-            )
-            sys.exit(1)
+        except ImportError as e:
+            raise FatalError(
+                f'Please run `pip install "pyclang[html]"` to install this optional dependency for this feature '
+                f'(import error: {e})'
+            ) from e
 
-        warn_file = self.get_check_warn_file(log_fs, output_dir)
+        warn_file = self.get_check_warn_file(output_dir)
         with open(warn_file) as fr:
             warnings_str = fr.read()
 
@@ -467,7 +465,7 @@ class Runner:
             res.append(ReportItem(path, line, severity, msg, code, col).dict())
 
         if not res:
-            log_fs.write('No issue found\n')
+            log.print('No issue found')
             return
 
         report_json_fn = os.path.join(output_dir, 'report.json')
@@ -480,25 +478,23 @@ class Runner:
 
         known_issue = run_cmd(
             ['codereport', '--prefix', self.base_dir, report_json_fn, 'html_report'],
-            log_stream=log_fs,
             cwd=output_dir,
             ignore_error='AssertionError: No existing files found',
             expect_returncode=self.expect_returncode,
         )
-        if known_issue:
-            log_fs.write('No issue found\n')
+        # KnownIssue means codereport hit the expected "no files" assertion; a plain
+        # int return code (0 or accepted non-zero) means the report was generated.
+        if isinstance(known_issue, KnownIssue):
+            log.print('No issue found')
         else:
-            log_fs.write(
-                f'Please open {output_dir}/html_report/index.html to view the report\n'
-            )
+            log.print(f'Please open {escape(output_dir)}/html_report/index.html to view the report')
 
     @chain
     def normalize(self, *args):
         """
         Normalize and replace all the paths to relative path in the file with specified base_dir
         """
-        log_fs = args[1]
-        output_dir = args[2]
+        output_dir = args[1]
 
         warn_file = os.path.join(output_dir, self.WARN_FILENAME)
         with open(warn_file, 'r') as fr:
@@ -518,4 +514,4 @@ class Runner:
 
                     line = line.replace(path, norm_path)
                 fw.write(line)
-        log_fs.write(f'Normalized file {warn_file}\n')
+        log.print(f'Normalized file {escape(warn_file)}')

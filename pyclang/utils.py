@@ -6,6 +6,9 @@ from pathlib import Path
 
 import typing as t
 
+from rich.markup import escape
+from esp_pylib.logger import log
+
 
 def to_path(*args: str) -> Path:
     return Path(os.path.expanduser(os.path.join(*args))).resolve()
@@ -27,17 +30,16 @@ class KnownIssue(Exception):
 
 def run_cmd(
     cmd: t.Union[t.List[str], str],
-    log_stream: t.TextIO = sys.stdout,
     stream: t.TextIO = sys.stdout,
     ignore_error: t.Optional[str] = None,
     expect_returncode: t.Optional[t.Union[t.List[int], int]] = None,
     **kwargs,
-) -> t.Optional[KnownIssue]:
+) -> t.Union[KnownIssue, int]:
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
     cmd_str = ' '.join(cmd)
 
-    log_stream.write(f'Running command: "{cmd_str}"...\n')
+    log.print(f'Running command: "{escape(cmd_str)}"...')
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     # live print the stdout as well
     for line in p.stdout:
@@ -55,18 +57,17 @@ def run_cmd(
     returncode = p.wait()
     raw_stderr = to_str(p.stderr.read())
     if returncode not in expect_returncode:
-        sys.stderr.write(f'\nERROR: Command "{cmd_str}" failed with exit code {returncode}\n')
+        log.err(f'Command "{escape(cmd_str)}" failed with exit code {returncode}')
         if raw_stderr:
-            sys.stderr.write(f'Details:\n{raw_stderr}\n')
-        sys.stderr.flush()
+            log.err(f'Details:\n{escape(raw_stderr)}')
         raise SystemExit(returncode)
 
     if raw_stderr:
         if ignore_error and ignore_error in raw_stderr:
             return KnownIssue()  # nothing happens
 
-        sys.stderr.write(
-            f'command "{cmd_str}" gives the following warnings with exitcode {returncode}:\n{raw_stderr}\n'
+        log.warn(
+            f'Command "{escape(cmd_str)}" gives the following warnings with exit code {returncode}:\n{escape(raw_stderr)}'
         )
 
     return returncode

@@ -26,8 +26,15 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     packages=setuptools.find_packages(),
     python_requires='>=3.7',
+    install_requires=[
+        'esp-pylib[cli]>=1.1.1',
+        'rich',
+    ],
     extras_require={
-        'html': ['codereport~=0.4'],
+        # codereport 0.4.x → fs 2.x → pkg_resources (removed in setuptools 82).
+        # Pin setuptools<82 so pkg_resources remains importable until codereport
+        # is replaced (tracked in IDF-11109).
+        'html': ['codereport~=0.4', 'setuptools<82'],
     },
     classifiers=[
         'Programming Language :: Python',
