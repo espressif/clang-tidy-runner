@@ -1,3 +1,9 @@
+## v0.7.0 (2026-07-13)
+
+### New Features
+
+- migrate to esp-pylib for logging, CLI, and error handling
+
 ## v0.6.3 (2025-04-30)
 
 ### Bug Fixes
